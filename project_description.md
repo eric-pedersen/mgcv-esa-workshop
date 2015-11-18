@@ -1,21 +1,7 @@
 # The mgcv package as a one-stop-shop for fitting non-linear ecological models
 
-The amount and complexity of ecological data has grown substantially in the last decade, 
-and with it the need for statistical models flexible enough to fit this data. 
-This workshop will focus on how a single tool, the mgcv package for the R language, 
-can be used to fit a wide range of types of data and ecological models. 
+To address the increase in both quantity and complexity of available data, ecologists require flexible, robust statistical models, as well as software to perform such analyses. This workshop will focus on how a single tool, the mgcv package for the R language, can be used to fit models to data from a wide range of sources.
 
-The mgcv package allows users to fit relationships between variables as nonlinear functions, 
-and is one of the most commonly used packages for non-parametric regression. 
-However, many users do not know how versatile a tool it actually is. 
-This workshop will focus on teaching participants how to use mgcv to fit a 
-wide variety of types of data (including zero-inflated,  heavy-tailed, and survival data) 
-and how to use mgcv to fit more complicated models (such as smooth interactions, time series, 
-seasonal effects, and spatial or spatio-temporal data). 
+mgcv is one of the most popular packages for modelling non-linear relationships. However, many users do not know how versatile and powerful a tool it cen be. This workshop will focus on teaching participants how to use mgcv in a wide variety of situations (including spatio-temporal, zero-inflated,  heavy-tailed, time series, and survival data) and advanced use of mgcv (fitting smooth interactions, seasonal effects, spatial effects, Markov random fields and varying-coefficient models).
 
-The goals for this workshop will be: (a) give participants a practical introduction to the concept of smoothing, 
-with a focus on why they would choose to use different types of smoothers b) learn to test how well a given mgcv 
-model fits and perform model selection c) give participants an idea of the range of modelling possibilities using this package. 
-Participants will be assumed to be familiar with the basics of R (loading and manipulating data, calling functions, and plotting) 
-and regression using R (linear models using lm() and generalized linear models using glm()). 
-The organizers have extensive practical experience with ecological statistics and modelling using mgcv.
+The workshop will give paricipants an understanding of: (a) practical elements of smoothing theory, with a focus on why they would choose to use different types of smoothers (b) model checking and selection (c) the range of modelling possibilities using mgcv. Participants will be assumed to be familiar with the basics of R (loading/manipulating data, functions, and plotting) and regression in R (lm() and glm()). The organizers have extensive practical experience with ecological statistics and modelling using mgcv.
