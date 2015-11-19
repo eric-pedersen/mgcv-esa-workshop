@@ -12,7 +12,7 @@ The workshop will give paricipants an understanding of: (a) practical elements o
 
 ### Summary sentence (appears in print only; 50 word max.)
 
-mgcv is one of the most popular R packages for non-linear modelling, but many users do not know how versatile and powerful it is. This workshop will focus on teaching participants how to use mgcv in a wide variety of situations and advanced use of mgcv for model fitting.
+mgcv is one of the most popular R packages for non-linear modelling, but many users do not know how versatile and powerful it is. This workshop will focus on using mgcv in a wide variety of situations common in ecology, and advanced use of mgcv for model fitting.
 
 ### Name and contact information (affiliation, email) for the lead organizer and any co-organizers
 
