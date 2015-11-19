@@ -15,27 +15,27 @@ The workshop will give paricipants an understanding of: (a) practical elements o
 
 ### Name and contact information (affiliation, email) for the lead organizer and any co-organizers
 
-Eric Pedersen 
-Center for Limnology 
-680 North Park Street 
-University of Wisconsin-Madison 
+Eric Pedersen  
+Center for Limnology  
+680 North Park Street  
+University of Wisconsin-Madison  
 Madison, WI, USA 53704 
-eric.pedersen@wisc.edu 
+eric.pedersen@wisc.edu
 
-David L Miller
-Northeast Fisheries Science Center
-National Oceanic and Atmospheric Administration
-166 Water Street
+David L Miller  
+Northeast Fisheries Science Center  
+National Oceanic and Atmospheric Administration  
+166 Water Street  
 Woods Hole, MA 02543
 
-Gavin L. Simpson
-Institute of Environmental Change and Society
-University of Regina
-3737 Wascana Parkway
-Regina
-Saskatchewan
+Gavin L. Simpson  
+Institute of Environmental Change and Society  
+University of Regina  
+3737 Wascana Parkway  
+Regina  
+Saskatchewan  
+Canada
 S4S 0A2
-
 
 ### Minimum and maximum number of participants (to assist in room assignment).
 10 minimum, 30 maximum.
