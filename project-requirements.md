@@ -10,8 +10,9 @@ mgcv is one of the most popular packages for modelling non-linear relationships.
 
 The workshop will give paricipants an understanding of: (a) practical elements of smoothing theory, with a focus on why they would choose to use different types of smoothers (b) model checking and selection (c) the range of modelling possibilities using mgcv. Participants will be assumed to be familiar with the basics of R (loading/manipulating data, functions, and plotting) and regression in R (lm() and glm()). The organizers have extensive practical experience with ecological statistics and modelling using mgcv.
 
-
 ### Summary sentence (appears in print only; 50 word max.)
+
+mgcv is one of the most popular R packages for non-linear modelling, but many users do not know how versatile and powerful it is. This workshop will focus on teaching participants how to use mgcv in a wide variety of situations and advanced use of mgcv for model fitting.
 
 ### Name and contact information (affiliation, email) for the lead organizer and any co-organizers
 
