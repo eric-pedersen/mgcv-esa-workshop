@@ -20,7 +20,9 @@
 # Data
 
 - `lynx`
-
+- breeding bird survey?
+  - time series per site (univariate, bells and whistles)
+  - spatial snapshot (spatial, bivariate)
 
 
 
@@ -107,11 +109,12 @@ Introduce a set of examples, let people pick what they want. Workbook-type situa
   * forest health data (Fahrmir)
   - model lakes connected by streams?
 - `"lpmatrix"` (Dave/Gavin)
+  - show the multiple possible realisations earlier on but explain them here
   - uncertainty about some summary (sum, derivatives etc)
-- `paraPen` (Dave) (quick)
-  - random effects
-- Functional data (demo)
-  - matrix `by=`
+  - generation of betas from the normal distn etc
+- random effects (Dave) (quick)
+  - `"re"`
+  - `paraPen`
 
 
 ## Smoother zoo
