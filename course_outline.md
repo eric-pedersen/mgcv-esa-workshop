@@ -1,29 +1,15 @@
+---
+title: Course outline
 
+---
 
-*Start time:* 8am
-*End time:* 5pm
+- *Start time:* 8am
+- *End time:* 5pm
 
 2x 4 hour blocks:
 
-- 8am-12pm
-- 1pm-5pm
-
-
-# Notes
-
-- May not be wifi
-  - bring spare router?
-- Script to run along with the workshop
-- Software Carpentry-esque
-* Template for analysis -- workflow
-
-# Data
-
-- `lynx`
-- breeding bird survey?
-  - time series per site (univariate, bells and whistles)
-  - spatial snapshot (spatial, bivariate)
-
+- Morning: 8am-12pm
+- Aternoon: 1pm-5pm
 
 
 # Morning
@@ -78,7 +64,6 @@
 
 - `summary()`
 
-
 ## Beyond the exponential family (all)
 
 *(1/2 slot?)*
@@ -87,6 +72,18 @@
 - Beta regression (Gavin)
 - Other stuff: t, `cox.ph`, ordered categorical, mvnorm (Eric)
 * Big list o' distributions (examples)
+
+# Afternoon
+
+## Smoother zoo
+
+* 2-D smoothers `s()` and `te()`
+  - soap film
+  - `"ts"`
+* Cyclic splines
+* `fs` basis/`by=`
+* random effects
+- Gaussian process smoothers?
 
 
 ## Extended examples/demos (all)
@@ -106,7 +103,7 @@ Introduce a set of examples, let people pick what they want. Workbook-type situa
 - Location-scale models (Demo)
   - Quick example (Gavin)
 - Markov random fields (Demo)
-  * forest health data (Fahrmir)
+  - forest health data (Fahrmir)
   - model lakes connected by streams?
 - `"lpmatrix"` (Dave/Gavin)
   - show the multiple possible realisations earlier on but explain them here
@@ -117,14 +114,11 @@ Introduce a set of examples, let people pick what they want. Workbook-type situa
   - `paraPen`
 
 
-## Smoother zoo
 
-* 2-D smoothers `s()` and `te()`
-  - soap film
-  - `"ts"`
-* Cyclic splines
-* `fs` basis/`by=`
-* random effects
-- Gaussian process smoothers?
+# Data
 
+- `lynx`
+- breeding bird survey?
+  - time series per site (univariate, bells and whistles)
+  - spatial snapshot (spatial, bivariate)
 
