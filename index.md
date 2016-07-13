@@ -4,7 +4,7 @@ layout: page
 
 # Welcome to the `mgcv` course webpage.
 
-A course! To be given at the Ecological Society of America conference in Fort Lauderdale, Saturday August 7th 8am-5pm.
+A course! To be given at the Ecological Society of America conference in Fort Lauderdale, Saturday August 7th 8am-5pm. [Sign up here!](https://eco.confex.com/eco/2016/webprogram/Session11905.html)
 
 On this site we'll post the slides and examples from the course as well as any other useful information. Stay tuned!
 
