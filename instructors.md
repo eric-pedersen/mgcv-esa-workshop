@@ -10,9 +10,17 @@ The course will be taught by:
 ## Eric J Pedersen
 
 
+<br/>
+<br/>
+<br/>
+
 ## Gavin Simpson
 
 <img src="images/gavin-simpson.jpg" align="right">Gavin is a research scientist at the Institute of Environmental Change and Society, University Regina, Canada. He started using R (just) before version 1.0 was released and has maintains several R packages as well as contributing to and helping to maintain the popular `vegan` package. A (palaeo)limnologist and (palaeo)ecologist by training, Gavin is particularly interested in community dynamics in time (OK, and space) and as such invariably finds himself non-linear models to stubbornly-complicated time series data with `mgcv`.
+
+<br/>
+<br/>
+<br/>
 
 ## David L Miller
 
