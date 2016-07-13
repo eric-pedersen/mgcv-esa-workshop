@@ -1,7 +1,7 @@
 # Jekyll configuration
 
 name: mgcv course
-description: Site for the ESA 2016 mgcv workshop
+description: Information for the mgcv workshop hosted at the Ecological Society of America Annual Meeting 2016.
 
 # url is currently only used only for the RSS feed in feed.xml
 url: https://eric-pedersen.github.io/mgcv-esa-workshop/
