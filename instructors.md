@@ -9,6 +9,7 @@ The course will be taught by:
 
 ## Eric J Pedersen
 
+<img src="images/eric-pedersen.jpg" align="right">Eric Pedersen is a postdoctoral researcher in the Center for Limnology, at the University of Wisconsin -- Madison. He works on statistical and theoretical models of movement and community dynamics, and has been using R for his work for almost 10 years. He's currently pretending to be a fisheries ecologist, but has worked with everything from forest recruitment patterns to marine larval dispersal to human movement. He uses `mgcv` to model  nonlinear functional relationships, complex spatio-temporal patterns, and test mechanistic models. 
 
 <br/>
 <br/>
