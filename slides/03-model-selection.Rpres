@@ -1,14 +1,15 @@
-Model Selection
+GAMs: Model Selection
 ============================
 author: Gavin L Simpson
+date: August 6th, 2016
 css: custom.css
 transition: none
 
 Overview
 =========
 
-- *p* values
 - Confidence intervals for smooths
+- *p* values
 - Shrinkage smooths
 - Shrinkage via double penalty (`select = TRUE`)
 - AIC
@@ -21,8 +22,36 @@ library("ggplot2")
 opts_chunk$set(cache=TRUE, echo=FALSE)
 ```
 
-Section title?
-===============
+Confidence intervals for smooths
+================================
+type:section
+
+slide title
+====================
+
+p values for smooths
+====================
+type:section
+
+slide title
+====================
+
+Shrinkage smooths
+=================
+type:section
+
+slide title
+====================
+
+Global double-penalty shrinkage
+=====================
+type:section
+
+slide title
+====================
+
+AIC for GAMs
+=====================
 type:section
 
 slide title
