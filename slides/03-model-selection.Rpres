@@ -1,0 +1,29 @@
+Model Selection
+============================
+author: Gavin L Simpson
+css: custom.css
+transition: none
+
+Overview
+=========
+
+- *p* values
+- Confidence intervals for smooths
+- Shrinkage smooths
+- Shrinkage via double penalty (`select = TRUE`)
+- AIC
+
+```{r setup, include=FALSE}
+library("knitr")
+library("viridis")
+library("ggplot2")
+##library("reshape2")
+opts_chunk$set(cache=TRUE, echo=FALSE)
+```
+
+Section title?
+===============
+type:section
+
+slide title
+====================
