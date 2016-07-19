@@ -1,0 +1,614 @@
+Generalized Additive Models
+============================
+author: David L Miller
+css: custom.css
+transition: none
+
+
+Overview
+=========
+
+- What is a GAM?
+- What is smoothing?
+- How do GAMs work?
+- Fitting GAMs using `dsm`
+- Model checking
+
+```{r setup, include=FALSE}
+library(knitr)
+library(magrittr)
+library(viridis)
+library(ggplot2)
+library(reshape2)
+library(dsm)
+library(animation)
+opts_chunk$set(cache=TRUE, echo=FALSE)
+```
+
+What is a GAM?
+===============
+type:section
+
+"gam"
+====================
+
+1. *Collective noun used to refer to a group of whales, or rarely also of porpoises; a pod.*
+2. *(by extension) A social gathering of whalers (whaling ships).*
+
+(via Natalie Kelly, from Moby Dick.)
+
+Generalized Additive Models
+============================
+
+- Generalized: many response distributions
+- Additive: terms **add** together
+- Models: well, it's a model...
+
+To GAMs from GLMs and LMs
+=============================
+type:section
+
+
+(Generalized) Linear Models
+=============================
+
+Models that look like:
+
+$$
+y_i = \beta_0 + x_{1i}\beta_1 + x_{2i}\beta_2 + \ldots + \epsilon_i
+$$
+
+(describe the response, $y_i$, as linear combination of the covariates, $x_{ji}$, with an offset)
+
+We can make $y_i\sim$ any exponential family distribution (Normal, Poisson, etc).
+
+Why bother with anything more complicated?!
+=============================
+type:section
+
+blah
+=============================
+
+[placeholder for everything going wrong]
+
+What can we do?
+=============================
+type:section
+
+
+blah
+=============================
+
+[placeholder for doing the dumb quadratic thing]
+
+Is this sustainable?
+=============================
+
+- Adding in quadratic *can* make sense
+- We can add higher terms
+- This feels a bit *ad hoc*
+- Wouldn't it be better if we had a **framework** to deal with these issues?
+
+[drumroll]
+=============================
+type:section
+
+
+What does a model look like?
+=============================
+
+$$
+y_i = \beta_0 + \sum_j s_j(\text{x}_{ji}) + \epsilon_i
+$$
+
+where $\epsilon_i \sim N(0, \sigma^2)$
+
+Let's pretend that $y_i \sim \text{Normal}$
+
+Remember that we're modelling the mean of this distribution!
+
+Okay, but what about these "s" things?
+====================================
+right:45%
+
+```{r smoothdat, fig.width=9, fig.height=6}
+set.seed(2) ## simulate some data...
+dat <- gamSim(1,n=400,dist="normal",scale=1, verbose=FALSE)
+dat <- dat[,c("y","x0","x1","x2","x3")]
+spdat <- melt(dat, id.vars = c("y"))
+p <- ggplot(spdat,aes(y=y,x=value)) +
+      geom_point() +
+      facet_wrap(~variable, nrow=1)
+print(p)
+```
+***
+- Think $s$=**smooth**
+- Want to model the covariates flexibly
+- Covariates and response not necessarily linearly related!
+- Want some "wiggles"
+
+Okay, but what about these "s" things?
+====================================
+right:45%
+
+```{r wsmooths, fig.width=9, fig.height=6}
+p <- p + geom_smooth()
+print(p)
+```
+***
+- Think $s$=**smooth**
+- Want to model the covariates flexibly
+- Covariates and response not necessarily linearly related!
+- Want some "wiggles"
+
+What is smoothing?
+===============
+type:section
+
+
+Straight lines vs. interpolation
+=================================
+
+```{r wiggles}
+library(mgcv)
+# hacked from the example in ?gam
+set.seed(2) ## simulate some data... 
+dat <- gamSim(1,n=50,dist="normal",scale=0.5, verbose=FALSE)
+dat$y <- dat$f2 + rnorm(length(dat$f2), sd = sqrt(0.5))
+f2 <- function(x) 0.2*x^11*(10*(1-x))^6+10*(10*x)^3*(1-x)^10-mean(dat$y)
+ylim <- c(-4,6)
+
+# fit some models
+b.justright <- gam(y~s(x2),data=dat)
+b.sp0 <- gam(y~s(x2, sp=0, k=50),data=dat)
+b.spinf <- gam(y~s(x2),data=dat, sp=1e10)
+
+curve(f2,0,1, col="blue", ylim=ylim)
+points(dat$x2, dat$y-mean(dat$y))
+
+```
+***
+- Want a line that is "close" to all the data
+- Don't want interpolation -- we know there is "error"
+- Balance between interpolation and "fit"
+
+Splines
+========
+
+- Functions made of other, simpler functions
+- **Basis functions** $b_k$, estimate $\beta_k$ 
+- $s(x) = \sum_{k=1}^K \beta_k b_k(x)$
+- Makes the math(s) much easier
+
+<img src="images/addbasis.png">
+
+Measuring wigglyness
+======================
+
+- Visually:
+  - Lots of wiggles == NOT SMOOTH
+  - Straight line == VERY SMOOTH
+- How do we do this mathematically?
+  - Derivatives!
+  - (Calculus *was* a useful class afterall)
+
+
+
+Wigglyness by derivatives
+==========================
+
+```{r wigglyanim, results="hide"}
+library(numDeriv)
+f2 <- function(x) 0.2*x^11*(10*(1-x))^6+10*(10*x)^3*(1-x)^10 - mean(dat$y)
+
+xvals <- seq(0,1,len=100)
+
+plot_wiggly <- function(f2, xvals){
+
+  # pre-calculate
+  f2v <- f2(xvals)
+  f2vg <- grad(f2,xvals)
+  f2vg2 <- unlist(lapply(xvals, hessian, func=f2))
+  f2vg2min <- min(f2vg2) -2
+  
+  # now plot
+  for(i in 1:length(xvals)){
+    par(mfrow=c(1,3))
+    plot(xvals, f2v, type="l", main="function", ylab="f")
+    points(xvals[i], f2v[i], pch=19, col="red")
+    
+    plot(xvals, f2vg, type="l", main="derivative", ylab="df/dx")
+    points(xvals[i], f2vg[i], pch=19, col="red")
+    
+    plot(xvals, f2vg2, type="l", main="2nd derivative", ylab="d2f/dx2")
+    points(xvals[i], f2vg2[i], pch=19, col="red")
+    polygon(x=c(0,xvals[1:i], xvals[i],f2vg2min),
+            y=c(f2vg2min,f2vg2[1:i],f2vg2min,f2vg2min), col = "grey")
+    
+    ani.pause()
+  }
+}
+
+saveGIF(plot_wiggly(f2, xvals), "wiggly.gif", interval = 0.2, ani.width = 800, ani.height = 400)
+```
+
+![Animation of derivatives](wiggly.gif)
+
+What was that grey bit?
+=========================
+
+$$
+\int_\mathbb{R} \left( \frac{\partial f(x)}{\partial x}\right)^2 \text{d}x
+$$
+
+
+Making wigglyness matter
+=========================
+
+- Integration of derivative (squared) gives wigglyness
+- Fit needs to be **penalised**
+- **Penalty matrix** gives the wigglyness 
+- Estimate the $\beta_k$ terms but penalise objective
+  - "closeness to data" + penalty
+
+Penalty matrix
+===============
+
+- For each $b_k$ calculate the penalty
+- Penalty is a function of $\beta$
+  - $\lambda \beta^\text{T}S\beta$
+- $S$ calculated once
+- smoothing parameter ($\lambda$) dictates influence
+
+Smoothing parameter
+=======================
+
+
+```{r wiggles-plot, fig.width=15}
+# make three plots, w. estimated smooth, truth and data on each
+par(mfrow=c(1,3), cex.main=3.5)
+
+plot(b.justright, se=FALSE, ylim=ylim, main=expression(lambda*plain("= just right")))
+points(dat$x2, dat$y-mean(dat$y))
+curve(f2,0,1, col="blue", add=TRUE)
+
+plot(b.sp0, se=FALSE, ylim=ylim, main=expression(lambda*plain("=")*0))
+points(dat$x2, dat$y-mean(dat$y))
+curve(f2,0,1, col="blue", add=TRUE)
+
+plot(b.spinf, se=FALSE, ylim=ylim, main=expression(lambda*plain("=")*infinity)) 
+points(dat$x2, dat$y-mean(dat$y))
+curve(f2,0,1, col="blue", add=TRUE)
+
+```
+
+How wiggly are things?
+========================
+
+- We can set **basis complexity** or "size" ($k$)
+  - Maximum wigglyness
+- Smooths have **effective degrees of freedom** (EDF)
+- EDF < $k$
+- Set $k$ "large enough"
+
+Okay, that was a lot of theory...
+==================================
+type:section
+
+Fitting GAMs using dsm
+=========================
+type:section
+
+Translating maths into R
+==========================
+
+$$
+n_j = A_j\hat{p}_j \exp\left[ \beta_0 + s(\text{y}_j) \right] + \epsilon_j
+$$
+<br/>
+where $\epsilon_j \sim N(0, \sigma^2)$, $\quad n_j\sim$ count distribution
+<br/>
+- inside the link: `formula=count ~ s(y)`
+- response distribution: `family=nb()` or `family=tw()`
+- detectability: `ddf.obj=df_hr`
+- offset, data: `segment.data=segs, observation.data=obs` 
+
+
+Your first DSM
+===============
+
+```{r loaddat}
+load("../spermwhale-analysis/df-models.RData")
+load("../spermwhale-analysis/sperm-data.RData")
+```
+```{r firstdsm, echo=TRUE}
+library(dsm)
+dsm_x_tw <- dsm(count~s(x), ddf.obj=df_hr,
+                segment.data=segs, observation.data=obs,
+                family=tw(), method="REML")
+```
+
+(`method="REML"` uses REML to select the smoothing parameter)
+
+`dsm` is based on `mgcv` by Simon Wood
+
+What did that do?
+===================
+
+```{r echo=TRUE}
+summary(dsm_x_tw)
+```
+
+Plotting
+================
+
+```{r plotsmooth}
+plot(dsm_x_tw)
+```
+***
+- `plot(dsm_x_tw)`
+- Dashed lines indicate +/- 2 standard errors
+- Rug plot
+- On the link scale
+- EDF on $y$ axis
+
+
+Adding a term
+===============
+
+- Just use `+`
+```{r xydsm, echo=TRUE}
+dsm_xy_tw <- dsm(count ~ s(x) + s(y),
+                 ddf.obj=df_hr,
+                 segment.data=segs, observation.data=obs,
+                 family=tw(), method="REML")
+```
+
+Summary
+===================
+
+```{r echo=TRUE}
+summary(dsm_xy_tw)
+```
+
+Plotting
+================
+
+```{r plotsmooth-xy, fig.width=12, echo=TRUE}
+plot(dsm_xy_tw, scale=0, pages=1)
+```
+- `scale=0`: each plot on different scale
+- `pages=1`: plot together
+
+
+Bivariate terms
+================
+
+- Assumed an additive structure
+- No interaction
+- We can specify `s(x,y)` (and `s(x,y,z,...)`)
+
+Thin plate regression splines
+================================
+
+- Default basis
+- One basis function per data point
+- Reduce # basis functions (eigendecomposition)
+- Fitting on reduced problem
+- Multidimensional
+
+Thin plate splines (2-D)
+====================
+
+<img src="images/tprs.png" alt="Thin plate regression spline basis functions. Taken from Wood 2006.">
+
+
+Bivariate spatial term
+=======================
+
+```{r xy-biv-dsm, echo=TRUE}
+dsm_xyb_tw <- dsm(count ~ s(x, y),
+                 ddf.obj=df_hr,
+                 segment.data=segs, observation.data=obs,
+                 family=tw(), method="REML")
+```
+
+Summary
+===================
+
+```{r echo=TRUE}
+summary(dsm_xyb_tw)
+```
+
+Plotting... erm...
+================
+
+```{r plotsmooth-xy-biv}
+plot(dsm_xyb_tw)
+```
+
+Let's try something different
+===============================
+
+```{r visgam, echo=TRUE}
+vis.gam(dsm_xyb_tw, view=c("x","y"), plot.type="contour", too.far=0.1, asp=1)
+```
+- Still on link scale
+- `too.far` excludes points far from data
+
+Comparing bivariate and additive models
+========================================
+
+```{r xy-x-y, fig.width=15}
+dsm_xy_nb <- dsm(count~s(x,y),
+                 ddf.obj=df_hr,
+                 segment.data=segs, observation.data=obs,
+                 family=nb(), method="REML")
+dsm_x_y_nb <- dsm(count~s(x) +s(y),
+                  ddf.obj=df_hr,
+                  segment.data=segs, observation.data=obs,
+                  family=nb(), method="REML")
+par(mfrow=c(1,2))
+vis.gam(dsm_xy_nb, plot.type = "contour", view=c("x","y"), zlim = c(-11,1), too.far=0.1, asp=1, main="Bivariate")
+vis.gam(dsm_x_y_nb, plot.type = "contour", view=c("x","y"), zlim = c(-11,1), too.far=0.1, asp=1, main="Additive")
+```
+
+Model checking
+===============
+type:section
+
+<br/>
+<br/>
+*"perhaps the most important part of applied statistical modelling"*
+
+Simon Wood
+
+Model checking
+===============
+
+- As with detection function, checking is important
+- Want to know the model conforms to assumptions
+- What assumptions should we check?
+
+What to check
+===============
+
+- Convergence (not usually an issue)
+- Basis size is big enough
+- Residuals
+
+
+Basis size
+===========
+type:section
+
+Basis size (k)
+===========
+
+- Set `k` per term
+- e.g. `s(x, k=10)` or `s(x, y, k=100)`
+- Penalty removes "extra" wigglyness
+  - *up to a point!*
+- (But computation is slower with bigger `k`)
+
+Checking basis size
+====================
+
+```{r gamcheck-text, fig.keep="none", echo=TRUE}
+gam.check(dsm_x_tw)
+```
+
+
+Increasing basis size
+====================
+
+```{r gamcheck-kplus-text, fig.keep="none", echo=TRUE}
+dsm_x_tw_k <- dsm(count~s(x, k=20), ddf.obj=df_hr,
+                  segment.data=segs, observation.data=obs,
+                  family=tw(), method="REML")
+gam.check(dsm_x_tw_k)
+```
+
+Sometimes basis size isn't the issue...
+========================================
+
+- Generally, double `k` and see what happens
+- Didn't increase the EDF much here
+- Other things can cause low "`p-value`" and "`k-index`"
+- Increasing `k` can cause problems (nullspace)
+
+
+Don't throw away your residuals!
+==================================
+type:section
+
+
+What are residuals?
+====================
+
+- Generally residuals = observed value - fitted value
+- BUT hard to see patterns in these "raw" residuals
+- Need to standardise -- **deviance residuals**
+- Residual sum of squares $\Rightarrow$ linear model
+  - deviance $\Rightarrow$ GAM
+- Expect these residuals $\sim N(0,1)$
+
+Residual checking
+===================
+
+```{r gamcheck, results="hide"}
+gam.check(dsm_x_tw)
+```
+
+Shortcomings
+=============
+
+- `gam.check` left side can be helpful
+- Right side is victim of artifacts
+- Need an alternative
+- "Randomised quanitle residuals" (*experimental*)
+  - `rqgam.check`
+  - Exactly normal residuals (left side useless)
+
+
+
+Randomised quantile residuals
+==============================
+
+
+```{r rqgamcheck}
+rqgam.check(dsm_x_tw)
+```
+
+Residuals vs. covariates
+=========================
+
+```{r covar-resids, fig.width=12}
+library(statmod)
+par(mfrow=c(1,2))
+plot(dsm_x_tw$data$x, residuals(dsm_x_tw), ylab="Deviance residuals", xlab="x")
+environment(dsm_x_tw$family$variance)$p <- dsm_x_tw$family$getTheta(TRUE)
+plot(dsm_x_tw$data$x, qres.tweedie(dsm_x_tw), ylab="Randomised quantile residuals", xlab="x")
+```
+
+Residuals vs. covariates (boxplots)
+=========================
+
+```{r covar-resids-boxplot, fig.width=12}
+library(statmod)
+par(mfrow=c(1,2))
+
+resid_dat <- data.frame(x     = dsm_x_tw$data$x,
+                        x_cut = cut(dsm_x_tw$data$x,
+                                    seq(min(dsm_x_tw$data$x),
+                                        max(dsm_x_tw$data$x),
+                                        len=20)),
+                        dres  = residuals(dsm_x_tw),
+                        qres  = qres.tweedie(dsm_x_tw))
+
+plot(dres~x_cut, data=resid_dat, ylab="Deviance residuals", xlab="x")
+plot(qres~x_cut, data=resid_dat, ylab="Randomised quantile residuals", xlab="x")
+```
+
+Example of "bad" plots
+=======================
+
+![Bad residual check plot from Wood 2006](images/badgam.png)
+
+Example of "bad" plots
+=======================
+
+![Bad residual check plot from Wood 2006](images/badgam-annotate.png)
+
+Residual checks
+================
+
+- Looking for patterns (not artifacts)
+- This can be tricky
+- Need to use a mixture of techniques
+
+
+Let's have a go...
+==============================
+type:section
+
