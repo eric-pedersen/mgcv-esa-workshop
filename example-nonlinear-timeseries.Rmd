@@ -9,13 +9,13 @@ output:
 ---
 
 ##1. Background 
-This tutorial is to show you how to use `mgcv` for non-linear
-time series data. With time series, the values you observe at a current time,
-are assumed to depend on the previous values of the time series: **_x(t) =
-f(x(t-1), x(t-2),...)_**. Compare this to standard statistical methods, which
-assume each data point is independent of the others once you account for any
-covariates, or spatial statistics, which assume that the value at a given point
-depends on all its neighbours, not just the ones in one direction from it.
+This tutorial is to show you how to use `mgcv` for non-linear time series data.
+With time series, the values you observe at a current time, $y(t)$, are assumed
+to depend on the previous values of the time series: **_y(t) = f(y(t-1),
+y(t-2),...)_**. Compare this to standard statistical methods, which assume each
+data point is independent of the others once you account for any covariates, or
+spatial statistics, which assume that the value at a given point depends on all
+its neighbours, not just the ones in one direction from it.
 
 A good example of time series data would be a population of animals fluctuating 
 over time. If the population is well-above carrying capacity currently, it's 
@@ -25,15 +25,23 @@ it changes over time in response to its own density. Generalized additive
 models, using `mgcv`, are very useful for this as they allow you to model 
 current values as a non-linear function of past values.
 
+This tutorial has two major sections. In the first one (part 3), we talk about
+how to use GAMs to model trends, with autocorrelated background noise. The
+second section (part 4) focuses on using GAMs to model complex nonlinear dependencies
+between time points, for cases where you really care about how current
+observations depend on previous observations (for instance, when trying to
+estimate population dynamics). You don't have to do both sections; each stands
+alone, so feel free to work through whichever of the two is more useful for you.
+
 ## 2. Key concepts and functions: 
-Here's a few key ideas and R functions you
-should familiarize yourself with if you haven't already encountered them before.
-For the R functions (which will be) highlighted `like this`, use
-`?function_name` to look them up. If you're familiar with time series stats,
-skip to the next part.
+Here's a few key ideas and R functions you should familiarize yourself with if 
+you haven't already encountered them before. For the R functions (which will be)
+highlighted `like this`, use `?function_name` to look them up. If you're 
+familiar with time series stats, skip to the next part.
 
 _Trend_: The long-term value around which a time series is fluctuating. For 
-instance, if the habitat for a population is slowly deteriorating, its trend
+instance, if the habitat for a population is slowly deteriorating, it will show
+a decreasing trend.
 
 _Seasonal effect_: Many time series show a strong seasonal pattern, so the 
 average value of the series depends on time of year. For instance, our 
@@ -42,7 +50,7 @@ higher then and decline throughout the year.
 
 _Stationary time series_: This is a time series without any trend or seasonal 
 components, so if you looked at multiple realizations of the time series, the 
-mean and variance (and other statistical properties) averaged across
+mean and variance (and other statistical properties) averaged across 
 realizations would not change with time.
 
 _Autocorrelation function (`acf`)_: This is a function that describes how 
@@ -50,24 +58,33 @@ correlated a time series is with itself at different time lags; that is, the acf
 of a time series x is: acf(x,i) = cor(x(t),x(t-i)), where i is a given lag. In 
 `R`, use the function `acf(x)` to view the acf function for series `x`.
 
-_`gamm`_: This function fits a generalized additive *mixed effects* model, using the
-`nlme` package. We haven't discussed it too much in the rest of the course, but
-it's a tool to include more complicated mixed effects models than is allowed for by 
-the bs="re" method we discussed earlier. More importantly for this tutorial, it
-also allows you to add correlations between errors into your model. This lets you
-specify how the errors are related to one another, using a range of models. Look up
-`?corStruct` if you're interested in the range of possible error correlations allowed.
-The `gamm` function creates a list object, with two items in it: a gam model, containing
-the smooth terms, which functions like the gam models you've been working with so far, 
-and an lme object, that contains the random effects, and in our case correlation functions.
+_`gamm`_: This function fits a generalized additive *mixed effects* model, using
+the `nlme` package. We haven't discussed it too much in the rest of the course, 
+but it's a tool to include more complicated mixed effects models than is allowed
+for by the bs="re" method we discussed earlier. More importantly for this 
+tutorial, it also allows you to add correlations between errors into your model.
+This lets you specify how the errors are related to one another, using a range 
+of models. Look up `?corStruct` if you're interested in the range of possible 
+error correlations allowed. The `gamm` function creates a list object, with two 
+items in it: a gam model, containing the smooth terms, which functions like the 
+gam models you've been working with so far, and an lme object, that contains the
+random effects, and in our case correlation functions.
 
 ## 3. Nonlinear decomposition of time series: trend, seasonal, and random values
-In many cases, what we're interested in is estimating how things are changing over
-time, and the fact that the time series is autocorrelated is a nuisance; it makes
-it harder to get reliable estimates of the trends we're actually interested in.
-In this section, we'll show you how to estimate non-linear trends, while 
-accounting for autocorrelation in residuals.
+In many cases, what we're interested in is estimating how things are changing
+over time, and the fact that the time series is autocorrelated is a nuisance; it
+makes it harder to get reliable estimates of the trends we're actually
+interested in. In this section, we'll show you how to estimate non-linear
+trends, while accounting for autocorrelation in residuals. This example assumes
+that a time series can be broken down into two main components: a mean effect,
+that changes over time, and an error term with autocorrelated errors, so the
+model for the dependent variable looks like:
 
+$$y(t) = f(t) + \epsilon(t) $$
+$$\epsilon(t) = \sum_{i=1}^{n} \alpha_i \cdot \epsilon(t-i) + rnorm(0, \sigma)$$
+
+Where $f(t)$ is a smooth function of time, $\alpha_i$ are the auto-regressive
+coefficients, and $\sigma$ is the standard deviation of model errors.
 
 ###Loading and viewing the data
 The first time series we'll look at is a long-term temperature and precipitation
@@ -87,13 +104,15 @@ library(dplyr)
 library(mgcv)
 library(ggplot2)
 library(tidyr)
-data_florida_climate = read.csv("data/time_series/Florida_climate.csv",
+florida = read.csv("data/time_series/Florida_climate.csv",
                            stringsAsFactors = F)
-head(data_florida_climate)
+head(florida)
 
-qplot(month, air_temp,color=year,group=year, 
-      data= data_florida_climate,geom=c("line","point"))
-acf(data_florida_climate$air_temp)
+ggplot(aes(x=month, y=air_temp,color=year,group=year), 
+      data= florida)+
+  geom_point()+
+  geom_line()
+acf(florida$air_temp,lag.max = 36)
 ```
 
 Looking at the time series, it does look like later years are 
@@ -103,10 +122,17 @@ warmer, but we should model it to see how much warmer.
 ###Modelling yearly and seasonal trends
 The first model we'll fit will include both a yearly and seasonal trend. Note that
 the seasonal trend uses a cyclic smoother, as January and December values should
-be close to one another.
+be close to one another. Also note that we've specified a `knots` command for
+the month term, with knots at 0.5 and 12.5 months. This is because if we just
+left it as is, `mgcv` would assume that month 1 and month 12 were the end
+points, and should therefore have the same value. Since January and December
+will have different mean temperatures, this creates a bias. By specifying knots
+like this, we are stating that the point of equality should occur equidistant
+between the middle of January and the middle of December.
 
 ```{r, echo=T,tidy=F,include=T, message=FALSE}
-model_temp_basic = gamm(air_temp~s(year)+s(month,bs="cc",k=12),data=data_florida_climate)
+model_temp_basic = gamm(air_temp~s(year)+s(month,bs="cc",k=12),data=florida,
+                        knots = list(month = c(0.5, 12.5)))
 plot(model_temp_basic$gam,page=1,scale=0)
 summary(model_temp_basic$gam)
 ```
@@ -116,53 +142,63 @@ months, and that temperatures haven been rising non-linearly, with a much faster
 of increase since 2010. The model seems to fit well; however, if we look at the acf, 
 there's still substantial unexplained autocorrelation:
 ```{r, echo=T,tidy=F,include=T, message=FALSE}
-plot(acf(residuals(model_temp_basic$gam)))
+acf(residuals(model_temp_basic$gam),lag.max = 36)
 ```
 
 To incorporate the auto-correlated error structure, we need to use the slightly 
 more complex `gamm` function. This uses the `nlme` package to fit the model, and
-it allows us to add correlation functions (in this case, an auto-regressive
-model) to our GAM model. The model we'll add (an auto-regressive order-p model)
-assumes that the residuals at time t $\epsilon_t = \sum_{i=1}^{p}
-\alpha_p\epsilon_{t-i} + rnorm(0,\sigma)$. The more values you add to the
-auto-regressive model, the more complex time dependencies you can model. 
-Also note we specify the form of the correlation as `form= ~1|year`. This means
-that temperatures will only be assumed to be correlated within a given year, so there's
-no assumed correlation between the temperature in December of one year and January of
-the next. This is just to speed up computations for the workshop; in an actual analysis,
-we would not recommend ignoring these correlations. 
+it allows us to add correlation functions (in this case, an auto-regressive 
+model) to our GAM model. The model we'll add (an auto-regressive order-p model) 
+assumes that the residuals at time t $\epsilon_t = \sum_{i=1}^{p} 
+\alpha_p\epsilon_{t-i} + rnorm(0,\sigma)$. The more values you add to the 
+auto-regressive model, the more complex time dependencies you can model. Also 
+note we specify the form of the correlation as `form= ~1|year`. This means that 
+temperatures will only be assumed to be correlated within a given year, so 
+there's no assumed correlation between the temperature in December of one year 
+and January of the next. This is just to speed up computations for the workshop;
+in an actual analysis, we would not recommend ignoring these
+correlations[^sequential_data].
+
+[^sequential_data]:Also note that if your data is not organized so that data are
+sequential (so that `gamm` can assume that the prior data point is the one that
+occurs immediately before the current one), you'd have to give `corARMA` a
+unique term specifying the time each observation occurs at. You could do that
+for this data using: 
+`florida= mutate(florida, time = as.Date(paste(year, month,"15", sep = "-")))` 
+`corARMA(form = time|year, p=2)`
+
 
 ```{r, echo=T,tidy=F,include=T, message=FALSE}
 model_temp_autoreg1 = gamm(air_temp~s(year)+s(month,bs="cc",k=12),
                             correlation = corARMA(form=~1|year,p = 1),
-                            data=data_florida_climate)
+                            data=florida, knots = list(month = c(0.5, 12.5)))
 
 model_temp_autoreg2 = gamm(air_temp~s(year)+s(month,bs="cc",k=12),
                             correlation = corARMA(form=~1|year,p = 2),
-                            data=data_florida_climate)
+                            data=florida, knots = list(month = c(0.5, 12.5)))
 
 
-par(mfrow=c(3,2))
+layout(matrix(1:6, nrow = 3,byrow = T))
 plot(model_temp_basic$gam,scale=0,main="basic model")
 plot(model_temp_autoreg1$gam,scale=0,main="lag-1 model")
 plot(model_temp_autoreg2$gam,scale=0,main="lag-2 model")
+layout(1)
 
-
-par(mfrow=c(1,3))
-acf(residuals(model_temp_basic$lme,type="normalized"),main="basic model")
-acf(residuals(model_temp_autoreg1$lme,type="normalized"),main="lag-1 model")
-acf(residuals(model_temp_autoreg2$lme,type="normalized"),main="lag-2 model")
-par(mfrow=c(1,1))
-summary(model_temp_basic)
+layout(matrix(1:3, nrow = 1))
+acf(residuals(model_temp_basic$lme,type="normalized"),main="basic model",lag.max = 36)
+acf(residuals(model_temp_autoreg1$lme,type="normalized"),main="lag-1 model",lag.max = 36)
+acf(residuals(model_temp_autoreg2$lme,type="normalized"),main="lag-2 model",lag.max = 36)
+layout(1)
 ```
 
-Note that including the auto-regressive model resulted in a substantially
-smoother estimate of the long-term trend. Warming appears to still be speeding
-up, although not at the same rapid rate as in the naive model. Adding the first
-lag also seems to remove most of the auto-correlation in the data, although
-there appears to be at least some long-period auto-correlation at the  12-month
-scale. We can use an ANOVA to test whether adding the first or second autoregressive terms
-actually result in a better fitting model than the naive one.
+Note that including the auto-regressive model resulted in a substantially 
+smoother estimate of the long-term trend. Warming appears to still be speeding 
+up, although not at the same rapid rate as in the naive model. Adding the first 
+lag also seems to remove most of the auto-correlation in the data, although 
+there appears to be at least some long-period auto-correlation at the  12-month 
+scale. We can use an ANOVA to test whether adding the first or second
+autoregressive terms actually result in a better fitting model than the naive
+one.
 
 ```{r, echo=T,tidy=F,include=T, message=FALSE}
 anova(model_temp_basic$lme, model_temp_autoreg1$lme, model_temp_autoreg2$lme)
@@ -177,16 +213,11 @@ change over time. Is there evidence for changing seasonal patterns? How does
 this change once temperature autocorrelation is  accounted for? Hint: this will 
 require use tensor smooths.
 
-2. Construct a model to estimate seasonal and long-term trends in precipitation
-for the convention center. What lags are necessary to include in the model?
-Remember that precipitation is a positive variable (i.e. cannot go below zero),
-so you may want to either transform the variable or change the family (note that
-gamm uses a different algorithm than gam to estimate non-Gaussian terms, and it
-may give errors if you're also trying to estimate correlation structure).
-
-3. Try estimating how temperature and precipitation are related by adding an 
-extra smooth term into your precipitation model, with and without accounting for
-correlation. How does adding correlation terms change your estimates?
+2. Construct a model to estimate seasonal and long-term trends in precipitation 
+for the convention center. What lags are necessary to include in the model? 
+Remember that precipitation is a positive variable (i.e. cannot go below zero), 
+so you may want to transform the variable to better suit the model's
+assumptions.
 
 
 
@@ -227,10 +258,12 @@ library(mgcv)
 library(ggplot2)
 library(tidyr)
 data(lynx)
-data_lynx_full = data.frame(year=1821:1934, population = as.numeric(lynx))
-head(data_lynx_full)
-qplot(year, population, data= data_lynx_full, geom=c("point","line"))
-acf(data_lynx_full$population)
+lynx_full = data.frame(year=1821:1934, population = as.numeric(lynx))
+head(lynx_full)
+ggplot(aes(x=year, y=population), data= lynx_full)+
+  geom_point()+
+  geom_line()
+acf(lynx_full$population)
 ```
 
 Next we'll add some extra columns to the data, representing lagged population 
@@ -251,17 +284,18 @@ step in fitting this sort of data; it is very easy
 
 ```{r, echo=T,tidy=F,include=T, message=FALSE}
 
-mean_pop_l = mean(log(data_lynx_full$population))
-data_lynx_full = mutate(data_lynx_full, 
-                   lag1 = lag(log(population),1, default = mean_pop_l),
-                   lag2 = lag(log(population),2, default = mean_pop_l),
-                   lag3 = lag(log(population),3, default = mean_pop_l),
-                   lag4 = lag(log(population),4, default = mean_pop_l),
-                   lag5 = lag(log(population),5, default = mean_pop_l),
-                   lag6 = lag(log(population),6, default = mean_pop_l))
+mean_pop_l = mean(log(lynx_full$population))
+lynx_full = mutate(lynx_full, 
+                   popl = log(population),
+                   lag1 = lag(popl,1, default = mean_pop_l),
+                   lag2 = lag(popl,2, default = mean_pop_l),
+                   lag3 = lag(popl,3, default = mean_pop_l),
+                   lag4 = lag(popl,4, default = mean_pop_l),
+                   lag5 = lag(popl,5, default = mean_pop_l),
+                   lag6 = lag(popl,6, default = mean_pop_l))
 
-data_lynx_train = filter(data_lynx_full, year<1895)
-data_lynx_test = filter(data_lynx_full, year>=1895)
+lynx_train = filter(lynx_full, year<1895)
+lynx_test = filter(lynx_full, year>=1895)
 
 ```
 
@@ -273,45 +307,41 @@ and seeing how well each forecasts the test data, using one-step-ahead forecasti
 where we try to forecast the next step for each time point, given the observed data series:
 
 ```{r, echo=T,tidy=F,include=T, message=FALSE,fig.width=12}
-model_lynx_linear1 = gam(population~lag1, 
-                         data=data_lynx_train, family = "poisson", method="REML")
-model_lynx_linear2 = update(model_lynx_linear1,formula = population~lag1+lag2)
-model_lynx_linear3 = update(model_lynx_linear1,formula = population~lag1+lag2+lag3)
-model_lynx_linear4 = update(model_lynx_linear1,formula = population~lag1+lag2+lag3+lag4)
-model_lynx_linear5 = update(model_lynx_linear1,formula = population~lag1+lag2+lag3+lag4+lag5)
-model_lynx_linear6 = update(model_lynx_linear1,formula = population~lag1+lag2+lag3+lag4+lag5+lag6)
+lynx_lm1 = gam(population~lag1, 
+                         data=lynx_train, family = "poisson", method="REML")
+lynx_lm2 = update(lynx_lm1,formula = population~lag1+lag2)
+lynx_lm3 = update(lynx_lm1,formula = population~lag1+lag2+lag3)
+lynx_lm4 = update(lynx_lm1,formula = population~lag1+lag2+lag3+lag4)
 
-round(AIC(model_lynx_linear1,model_lynx_linear2,
-      model_lynx_linear3,model_lynx_linear4,
-      model_lynx_linear5,model_lynx_linear6))
+round(AIC(lynx_lm1,lynx_lm2,
+      lynx_lm3,lynx_lm4))
 
-data_lynx_predict_linear = mutate(
-  data_lynx_full,
-  lag1_model = as.vector(exp(predict(model_lynx_linear1,data_lynx_full))),
-  lag2_model = as.vector(exp(predict(model_lynx_linear2,data_lynx_full))),
-  lag3_model = as.vector(exp(predict(model_lynx_linear3,data_lynx_full))),
-  lag4_model = as.vector(exp(predict(model_lynx_linear4,data_lynx_full))),
-  lag5_model = as.vector(exp(predict(model_lynx_linear5,data_lynx_full))),
-  lag6_model = as.vector(exp(predict(model_lynx_linear6,data_lynx_full))),
+lynx_predict_lm = mutate(
+  lynx_full,
+  lag1_model = as.vector(exp(predict(lynx_lm1,lynx_full))),
+  lag2_model = as.vector(exp(predict(lynx_lm2,lynx_full))),
+  lag3_model = as.vector(exp(predict(lynx_lm3,lynx_full))),
+  lag4_model = as.vector(exp(predict(lynx_lm4,lynx_full))),
   data_type = factor(ifelse(year<1895, "training","testing"),
                      levels= c("training","testing"))
   )
 
 #Gathers all of the predictions into two columns: the model name and the predicted value
-data_lynx_predict_linear = gather(data_lynx_predict_linear,key= model, value= pop_est,
-                                  lag1_model:lag6_model )%>%
+lynx_predict_lm = gather(lynx_predict_lm,key= model, value= pop_est,
+                                  lag1_model:lag4_model )%>%
   mutate(pop_est = as.numeric(pop_est))
 
 
-linear_forecast_accuracy = data_lynx_predict_linear %>% 
+forecast_accuracy_lm = lynx_predict_lm %>% 
   group_by(model)%>%
   filter(data_type=="testing")%>%
   summarize(out_of_sample_r2 = round(cor(log(pop_est),log(population))^2,2))
 
-print(linear_forecast_accuracy)
+print(forecast_accuracy_lm)
 
-qplot(year, population, data= data_lynx_predict_linear, 
-      geom = c("point","line"))+
+ggplot(aes(x=year, y=population), data= lynx_predict_lm)+
+  geom_point()+
+  geom_line()+
   geom_line(aes(y=pop_est,color=model))+
   scale_color_brewer(palette="Set1")+
   facet_grid(.~data_type,scales = "free_x")+
@@ -321,7 +351,7 @@ qplot(year, population, data= data_lynx_predict_linear,
 
 
 Note that the anova table shows that adding each lag substantially reduced model
-AIC, up to lag-5. Some work on this time series shows that you need up to 11
+AIC, up to lag-4. Some work on this time series shows that you need up to 11
 (!!) linear lag terms to effectively fit the model. Even the long-lagged models
 under-estimate population densities when the cycle is at a peak, and seem to
 miss-estimate the period of the cycle; the predicted peaks in the testing data
@@ -331,51 +361,47 @@ out-of-sample estimates of $R^2$, $R^2$ is highest with a two-lag model.
 
 
 ###Fitting and testing non-linear models
-Now let's look at how adding non-linear lag terms improves the model. We've constrained the 
-degrees of freedom of each smooth term as there's complex correlations between the lags, and 
-allowing too much freedom for the smooths can allow for complex and difficult to interpret smooths, 
-as well as poor out-of-sample performance.
+Now let's look at how adding non-linear lag terms improves the model. We've
+constrained the degrees of freedom of each smooth term as there's complex
+correlations between the lags, and allowing too much freedom for the smooths can
+allow for complex and difficult to interpret smooths, as well as poor
+out-of-sample performance.
 
 ```{r, echo=T,tidy=F,include=T, message=FALSE,fig.width=12}
-model_lynx_nonlin1 = gam(population~s(lag1,k=5), 
-                         data=data_lynx_train, family = "poisson", method="REML")
-model_lynx_nonlin2 = update(model_lynx_nonlin1,population~s(lag1,k=5)+s(lag2,k=5))
-model_lynx_nonlin3 = update(model_lynx_nonlin1,population~s(lag1,k=5)+s(lag2,k=5)+s(lag3,k=5))
-model_lynx_nonlin4 = update(model_lynx_nonlin1,population~s(lag1,k=5)+s(lag2,k=5)+s(lag3,k=5)+
+lynx_gam1 = gam(population~s(lag1,k=5), 
+                         data=lynx_train, family = "poisson", method="REML")
+lynx_gam2 = update(lynx_gam1,population~s(lag1,k=5)+s(lag2,k=5))
+lynx_gam3 = update(lynx_gam1,population~s(lag1,k=5)+s(lag2,k=5)+s(lag3,k=5))
+lynx_gam4 = update(lynx_gam1,population~s(lag1,k=5)+s(lag2,k=5)+s(lag3,k=5)+
                               s(lag4,k=5))
-model_lynx_nonlin5 = update(model_lynx_nonlin1,population~s(lag1,k=5)+s(lag2,k=5)+s(lag3,k=5)+
-                              s(lag4,k=5)+s(lag5,k=5))
-model_lynx_nonlin6 = update(model_lynx_nonlin1,population~s(lag1,k=5)+s(lag2,k=5)+s(lag3,k=5)+
-                              s(lag4,k=5)+s(lag5,k=5)+s(lag6,k=5))
 
-round(AIC(model_lynx_nonlin1,model_lynx_nonlin2,model_lynx_nonlin3,
-      model_lynx_nonlin4,model_lynx_nonlin5,model_lynx_nonlin6))
+round(AIC(lynx_gam1,lynx_gam2,lynx_gam3,lynx_gam4))
 
-data_lynx_predict_nonlinear = mutate(
-  data_lynx_full,
-  lag1_model = as.vector(exp(predict(model_lynx_nonlin1,data_lynx_full))),
-  lag2_model = as.vector(exp(predict(model_lynx_nonlin2,data_lynx_full))),
-  lag3_model = as.vector(exp(predict(model_lynx_nonlin3,data_lynx_full))),
-  lag4_model = as.vector(exp(predict(model_lynx_nonlin4,data_lynx_full))),
-  lag5_model = as.vector(exp(predict(model_lynx_nonlin5,data_lynx_full))),
-  lag6_model = as.vector(exp(predict(model_lynx_nonlin6,data_lynx_full))),
+lynx_predict_gam = mutate(
+  lynx_full,
+  lag1_model = as.vector(exp(predict(lynx_gam1,lynx_full))),
+  lag2_model = as.vector(exp(predict(lynx_gam2,lynx_full))),
+  lag3_model = as.vector(exp(predict(lynx_gam3,lynx_full))),
+  lag4_model = as.vector(exp(predict(lynx_gam4,lynx_full))),
   data_type = factor(ifelse(year<1895, "training","testing"),
                      levels= c("training","testing"))
   )
 
 #Gathers all of the predictions into two columns: the model name and the predicted value
-data_lynx_predict_nonlinear = gather(data_lynx_predict_nonlinear,key= model, value= pop_est,
-                                  lag1_model:lag6_model)%>%
+lynx_predict_gam = gather(lynx_predict_gam,key= model, value= pop_est,
+                                  lag1_model:lag4_model)%>%
   mutate(pop_est = as.numeric(pop_est))
 
-nonlinear_forecast_accuracy = data_lynx_predict_nonlinear %>% 
+forecast_accuracy_gam = lynx_predict_gam %>% 
   group_by(model)%>%
   filter(data_type=="testing")%>%
   summarize(out_of_sample_r2 = round(cor(log(pop_est),log(population))^2,2))
 
-print(nonlinear_forecast_accuracy)
+print(forecast_accuracy_gam)
 
-qplot(year, population, data= data_lynx_predict_nonlinear, geom = c("point","line"))+
+ggplot(aes(x=year, y=population), data= lynx_predict_gam)+
+  geom_point()+
+  geom_line()+
   geom_line(aes(y=pop_est,color=model))+
   scale_color_brewer(palette="Set1")+
   facet_grid(.~data_type, scales="free_x")+
@@ -391,7 +417,7 @@ for the 2-lag model.
 
 
 ```{r, echo=T,tidy=F,include=T, message=FALSE}
-plot(model_lynx_nonlin2, page=1,scale=0)
+plot(lynx_gam2, page=1,scale=0)
 ```
  
 Our best fitting model, the 2-lag nonlinear model, indicates that log-lynx
@@ -417,10 +443,10 @@ variation than we'd expect from a Poisson distribution. Choose a distribution to
 model this extra variation. How does it affect your model estimates, and the
 estimated degree of non-linearity present?
 
-4. CHALLENGING: We focused, for simplicity, on one-step-ahead forecasting. However, 
-we often want to forecast over longer time horizons. If you have the time, try 
-figuring out how you can use this model to forecast whole trajectories of the
-out-of-sample data. Do the forecast trajectories for the linear or non-linear
-models have the same dynamic properties as the observed data? Hint: This will
-likely require a for-loop, and you'll have to calculate new lagged terms for
-each step.
+4. CHALLENGING: We focused, for simplicity, on one-step-ahead forecasting.
+However, we often want to forecast over longer time horizons. If you have the
+time, try figuring out how you can use this model to forecast whole trajectories
+of the out-of-sample data. Do the forecast trajectories for the linear or
+non-linear models have the same dynamic properties as the observed data? Hint:
+This will likely require a for-loop, and you'll have to calculate new lagged
+terms for each step.
