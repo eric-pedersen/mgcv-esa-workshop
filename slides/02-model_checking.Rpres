@@ -1,0 +1,417 @@
+Model checking
+============================
+author: Eric J Pedersen
+date: August 6th, 2016
+css: custom.css
+transition: none
+
+
+Outline
+=================
+So you have a GAM:
+- How do you know you have the right degrees of freedom? `gam.check()`
+- Diagnosing model issues: `gam.check()` part 2
+- Do you have the right error model? Randomized quantile residuals
+- When covariates aren't independent: estimating concurvity
+
+
+Packages you'll need to follow along:
+======================================
+```{r setup, include=TRUE}
+
+library(mgcv)
+library(magrittr)
+library(ggplot2)
+library(dplyr)
+library(statmod)
+source("quantile_resid.R")
+
+```
+
+```{r pres_setup, include =F}
+library(knitr)
+opts_chunk$set(cache=TRUE, echo=FALSE,fig.align="center")
+```
+
+
+GAMs are models too
+====================
+With all models, how accurate your predictions will be depends on how good the model is
+
+```{r misspecify,fig.width=15, fig.height=7}
+set.seed(15)
+model_list = c("right model", 
+               "wrong distribution",
+               "heteroskedasticity",
+               "dependent data",
+               "wrong functional form")
+n = 60
+sigma=1
+x = seq(-1,1, length=n)
+model_data = as.data.frame(expand.grid( x=x,model=model_list))
+model_data$y = 5*model_data$x^2 + 2*model_data$x
+for(i in model_list){
+  if(i == "right model"){
+    model_data[model_data$model==i, "y"] = model_data[model_data$model==i, "y"]+ 
+      rnorm(n,0, sigma)
+  } else if(i == "wrong distribution"){
+    model_data[model_data$model==i, "y"] = model_data[model_data$model==i, "y"]+ 
+      rt(n,df = 3)*sigma
+  } else if(i == "heteroskedasticity"){
+    model_data[model_data$model==i, "y"] = model_data[model_data$model==i, "y"]+  
+      rnorm(n,0, sigma*10^(model_data[model_data$model==i, "x"]))
+  } else if(i == "dependent data"){
+    model_data[model_data$model==i, "y"] = model_data[model_data$model==i, "y"]+ 
+      arima.sim(model = list(ar=c(.7)),n = n,sd=sigma) 
+  } else if(i=="wrong functional form") {
+    model_data[model_data$model==i, "y"] = model_data[model_data$model==i, "y"]+ 
+      rnorm(n,0, sigma) + ifelse(model_data[model_data$model==i, "x"]>0, 5,-5)
+  }
+}
+ggplot(aes(x,y), data= model_data)+
+  geom_point()+
+  geom_line(color=ifelse(model_data$model=="dependent data", "black",NA))+
+  facet_wrap(~model)+
+  geom_smooth(method=gam, formula = y~s(x,k=12),method.args = list(method="REML"))+
+  theme_bw()+
+  theme(strip.text = element_text(size=20))
+```
+
+
+So how do we test how well our model fits?
+===========================================
+type:section
+
+
+Examples:
+============================
+
+```{r sims, include=TRUE,echo=TRUE}
+set.seed(2)
+n = 400
+x1 = rnorm(n)
+x2 = rnorm(n)
+y_val =1 + 2*cos(pi*x1) + 2/(1+exp(-5*(x2)))
+y_norm = y_val + rnorm(n, 0, 0.5)
+y_negbinom = rnbinom(n, mu = exp(y_val),size=10)
+y_binom = rbinom(n,1,prob = exp(y_val)/(1+exp(y_val)))
+```
+
+```{r sims_plot,fig.width=15,fig.align="center"}
+layout(matrix(1:6, ncol=3))
+plot(x1,y_norm,cex.lab=2,cex.axis=2)
+plot(x2,y_norm,cex.lab=2,cex.axis=2)
+plot(x1,y_negbinom,cex.lab=2,cex.axis=2)
+plot(x2,y_negbinom,cex.lab=2,cex.axis=2)
+plot(x1,y_binom,cex.lab=2,cex.axis=2)
+plot(x2,y_binom,cex.lab=2,cex.axis=2)
+layout(1)
+```
+
+
+gam.check() part 1: do you have the right functional form?
+=============================
+type:section
+
+
+How well does the model fit?
+=============================
+- Many choices: k, family, type of smoother, ...
+- How do we assess how well our model fits?
+
+
+
+Basis size (k)
+==============
+
+- Set `k` per term
+- e.g. `s(x, k=10)` or `s(x, y, k=100)`
+- Penalty removes "extra" wigglyness
+  - *up to a point!*
+- (But computation is slower with bigger `k`)
+
+
+Checking basis size
+====================
+
+```{r gam_check_norm1, fig.keep="none", include=TRUE,echo=TRUE, fig.width=15,fig.align="center"}
+norm_model_1 = gam(y_norm~s(x1,k=4)+s(x2,k=4),method= "REML")
+gam.check(norm_model_1)
+```
+
+Checking basis size
+====================
+
+```{r gam_check_norm2, fig.keep="none", include=TRUE,echo=TRUE, fig.width=15,fig.align="center"}
+norm_model_2 = gam(y_norm~s(x1,k=12)+s(x2,k=4),method= "REML")
+gam.check(norm_model_2)
+```
+
+Checking basis size
+====================
+
+```{r gam_check_norm3, fig.keep="none", include=TRUE,echo=TRUE, fig.width=15,fig.align="center"}
+norm_model_3 = gam(y_norm~s(x1,k=12)+s(x2,k=12),method= "REML")
+gam.check(norm_model_3)
+```
+
+Checking basis size
+====================
+
+```{r gam_check_norm4, include=TRUE,echo=TRUE, fig.width=12, fig.height=6,fig.align="center"}
+layout(matrix(1:6,ncol=2,byrow = T))
+plot(norm_model_1);plot(norm_model_2);plot(norm_model_3)
+layout(1)
+```
+
+
+
+Using gam.check() part 2: visual checks
+=============================
+type:section
+
+
+gam.check() plots
+=============================
+
+`gam.check()` creates 4 plots: 
+
+1. Quantile-quantile plots of residuals. If the model is right, should follow 1-1 line
+
+2. Histogram of residuals
+
+3. Residuals vs. linear predictor
+
+4. Observed vs. fitted values
+
+`gam.check()` uses deviance residuals by default
+
+
+gam.check() plots: Gaussian data, Gaussian model
+=============================
+
+
+```{r gam_check_plots1, include=T,echo=TRUE, results="hide", fig.width=12, fig.height=6,fig.align="center"}
+norm_model = gam(y_norm~s(x1,k=12)+s(x2,k=12),method= "REML")
+gam.check(norm_model)
+```
+
+
+gam.check() plots: negative binomial data, Poisson model
+=============================
+
+
+```{r gam_check_plots2, include=T,echo=TRUE, results="hide", fig.width=12, fig.height=6,fig.align="center"}
+pois_model = gam(y_negbinom~s(x1,k=12)+s(x2,k=12),family=poisson,method= "REML")
+gam.check(pois_model)
+```
+
+gam.check() plots: negative binomial data, negative binomial model
+=============================
+
+
+```{r gam_check_plots3, include=T,echo=TRUE, results="hide", fig.width=12, fig.height=6,fig.align="center"}
+negbin_model = gam(y_negbinom~s(x1,k=12)+s(x2,k=12),family=nb,method= "REML")
+gam.check(negbin_model)
+```
+
+
+
+
+Exercises
+=============
+1. Work with the `y_negbinom` data. Try fitting both Poisson and negative
+binomial model, with different degrees of freedom. Using model summaries and
+`gam.check`, determine which model requires more degrees of freedom to fit well.
+How do the fitted functions vary between the two?
+
+2. Using the `y_binomial` data, fit a smooth model with `family=binomial`, and
+use `gam.check()` to determine the appropriate degrees of freedom. What do the
+`gam.check()` plots tell you about model fit?
+
+Fixing Residuals
+=================
+type:section
+
+What are residuals?
+====================
+
+- Generally residuals = observed value - fitted value
+- BUT hard to see patterns in these "raw" residuals
+- Need to standardise -- **deviance residuals**
+- Residual sum of squares $\Rightarrow$ linear model
+  - deviance $\Rightarrow$ GAM
+- Expect these residuals $\sim N(0,1)$
+
+
+
+Shortcomings
+=============
+
+- `gam.check` left side can be helpful
+- Right side is victim of artifacts
+- Need an alternative
+- "Randomised quanitle residuals" (*experimental*)
+  - `rqresiduals`
+  - Exactly normal residuals ... if the model is right!
+
+
+Using randomized quantile residuals
+=============
+
+
+```{r rqresid1, include=T,echo=TRUE, results="hide", fig.width=12, fig.height=6,fig.align="center"}
+pois_model = gam(y_negbinom~s(x1,k=12)+s(x2,k=12),family=poisson,method= "REML")
+pois_resid = residuals(pois_model, type="deviance")
+pois_rqresid = rqresiduals(pois_model)
+layout(matrix(1:2, nrow=1))
+plot(pois_model$linear.predictors,pois_resid)
+plot(pois_model$linear.predictors,pois_rqresid)
+```
+
+Using randomized quantile residuals
+=============
+
+
+```{r rqresid2, include=T,echo=TRUE, results="hide", fig.width=12, fig.height=6,fig.align="center"}
+negbin_model = gam(y_negbinom~s(x1,k=12)+s(x2,k=12),family=nb,method= "REML")
+negbin_rqresid = rqresiduals(negbin_model)
+layout(matrix(1:2, nrow=1))
+plot(pois_model$linear.predictors,pois_rqresid)
+plot(negbin_model$linear.predictors,negbin_rqresid)
+```
+
+
+Exercise
+=========
+Use the `rqresiduals` function to test the model residuals for patterns
+from your binomial model from the previous exercise
+
+Concurvity
+=============================
+type:section
+
+What is concurvity?
+======================
+
+- Nonlinear measure, similar to colinearity
+
+- Meaures, for each smooth term, how well this term could be approximated by
+  - `concurvity(model, full=TRUE)`: some combination of all other smooth terms
+  - `concurvity(model, full=FALSE)`: Each of the other smooth terms in the model 
+  (useful for identifying which terms are causing issues)
+
+A demonstration
+=============================
+
+
+```{r concurve1,fig.width=12, fig.height=5}
+library(mgcv)
+set.seed(1)
+n=200
+alpha = 0
+x1_cc = rnorm(n)
+mean_constant = alpha
+var_constant = alpha^2
+x2_cc = alpha*x1_cc^2 - mean_constant + rnorm(n,0,1-var_constant)
+par(mfrow=c(1,3))
+plot(x1_cc,x2_cc)
+y = 3 + cos(pi*x1_cc) + 1/(1+exp(-5*(x2_cc)))
+m1 = gam(y~s(x1_cc)+s(x2_cc),method= "REML")
+plot(m1,scale=0)
+print("concurvity(m1)")
+print(round(concurvity(m1),2))
+```
+
+
+
+A demonstration
+=============================
+
+
+```{r concurve2,fig.width=12, fig.height=5}
+set.seed(1)
+n=200
+alpha = 0.33
+mean_constant = alpha
+var_constant = alpha^2
+x1_cc = rnorm(n)
+x2_cc = alpha*x1_cc^2-mean_constant + rnorm(n,0,1-var_constant)
+par(mfrow=c(1,3))
+plot(x1_cc,x2_cc)
+y = 3 + cos(pi*x1_cc) + 1/(1+exp(-5*(x2_cc)))
+m1 = gam(y~s(x1_cc)+s(x2_cc),method= "REML")
+plot(m1,scale=0)
+print("concurvity(m1, full=TRUE)")
+print(round(concurvity(m1),2))
+```
+
+
+A demonstration
+=============================
+
+```{r concurve3,fig.width=12, fig.height=5}
+library(mgcv)
+set.seed(1)
+n=200
+max_val = sqrt(pi/(pi-2))
+alpha = 0.66
+x1_cc = rnorm(n)
+mean_constant = alpha
+var_constant = alpha^2
+x2_cc = alpha*x1_cc^2-mean_constant + rnorm(n,0,1-var_constant)
+par(mfrow=c(1,3))
+plot(x1_cc,x2_cc)
+y = 3 + cos(pi*x1_cc) + 1/(1+exp(-5*(x2_cc)))
+m1 = gam(y~s(x1_cc)+s(x2_cc),method= "REML")
+plot(m1,scale=0)
+print("concurvity(m1, full=TRUE)")
+print(round(concurvity(m1),2))
+```
+
+
+A demonstration
+=============================
+
+
+
+```{r concurve4,fig.width=12, fig.height=5}
+set.seed(1)
+alpha = 1
+mean_constant = alpha
+var_constant = alpha^2
+x2_cc = alpha*x1_cc^2-mean_constant + rnorm(n,0,1-var_constant)
+par(mfrow=c(1,3))
+plot(x1_cc,x2_cc)
+y = 3 + cos(pi*x1_cc) + 1/(1+exp(-5*(x2_cc)))
+m1 = gam(y~s(x1_cc)+s(x2_cc),method= "REML")
+plot(m1,scale=0)
+print("concurvity(m1, full=TRUE)")
+print(round(concurvity(m1),2))
+par(mfrow=c(1,1))
+```
+
+Concurvity: things to remember
+==============================
+- Can make your model unstable to small changes
+- `cor(data)` not sufficient: use the `concurvity(model)` function
+- Not always obvious from plots of smooths!!
+
+
+Overall
+=========
+Make sure to test your model! GAMs are powerful, but with great power...
+
+You should at least:
+
+1. Check if your smooths are sufficiently smooth
+
+2. Test if you have the right distribution
+
+3. Make sure there's no patterns left in your data
+
+4. If you have time series, grouped, spatial, etc. data, check for dependencies
+
+
+We'll get into testing for dependence later on in the extended examples.
+
