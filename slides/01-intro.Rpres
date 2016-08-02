@@ -10,9 +10,7 @@ Overview
 
 - What is a GAM?
 - What is smoothing?
-- How do GAMs work?
-- Fitting GAMs using `dsm`
-- Model checking
+- How do GAMs work? (*Roughly*)
 
 ```{r setup, include=FALSE}
 library(knitr)
@@ -28,14 +26,6 @@ opts_chunk$set(cache=TRUE, echo=FALSE)
 What is a GAM?
 ===============
 type:section
-
-"gam"
-====================
-
-1. *Collective noun used to refer to a group of whales, or rarely also of porpoises; a pod.*
-2. *(by extension) A social gathering of whalers (whaling ships).*
-
-(via Natalie Kelly, from Moby Dick.)
 
 Generalized Additive Models
 ============================
@@ -61,6 +51,8 @@ $$
 (describe the response, $y_i$, as linear combination of the covariates, $x_{ji}$, with an offset)
 
 We can make $y_i\sim$ any exponential family distribution (Normal, Poisson, etc).
+
+Error term $\epsilon_i$ is normally distributed (usually).
 
 Why bother with anything more complicated?!
 =============================
@@ -98,7 +90,7 @@ What does a model look like?
 =============================
 
 $$
-y_i = \beta_0 + \sum_j s_j(\text{x}_{ji}) + \epsilon_i
+y_i = \beta_0 + \sum_j s_j(x_{ji}) + \epsilon_i
 $$
 
 where $\epsilon_i \sim N(0, \sigma^2)$
@@ -190,7 +182,7 @@ Measuring wigglyness
   - Straight line == VERY SMOOTH
 - How do we do this mathematically?
   - Derivatives!
-  - (Calculus *was* a useful class afterall)
+  - (Calculus *was* a useful class afterall!)
 
 
 
@@ -238,27 +230,25 @@ What was that grey bit?
 =========================
 
 $$
-\int_\mathbb{R} \left( \frac{\partial f(x)}{\partial x}\right)^2 \text{d}x
+\int_\mathbb{R} \left( \frac{\partial^2 f(x)}{\partial^2 x}\right)^2 \text{d}x\\
 $$
 
+(Take some derivatives of the smooth and integrate them over $x$)
+
+(*Turns out* we can always write this as $\boldsymbol{\beta}^\text{T}S\boldsymbol{\beta}$, so the $\boldsymbol{\beta}$ is separate from the derivatives)
+
+(Call $S$ the **penalty matrix**)
 
 Making wigglyness matter
 =========================
 
-- Integration of derivative (squared) gives wigglyness
-- Fit needs to be **penalised**
-- **Penalty matrix** gives the wigglyness 
+- $\boldsymbol{\beta}^\text{T}S\boldsymbol{\beta}$ measures wigglyness
+- "Likelihood" measures closeness to the data
+- Penalise closeness to the data...
+- Use a **smoothing parameter** to decide on that trade-off...
+  - $\lambda \beta^\text{T}S\beta$
 - Estimate the $\beta_k$ terms but penalise objective
   - "closeness to data" + penalty
-
-Penalty matrix
-===============
-
-- For each $b_k$ calculate the penalty
-- Penalty is a function of $\beta$
-  - $\lambda \beta^\text{T}S\beta$
-- $S$ calculated once
-- smoothing parameter ($\lambda$) dictates influence
 
 Smoothing parameter
 =======================
@@ -282,7 +272,18 @@ curve(f2,0,1, col="blue", add=TRUE)
 
 ```
 
-How wiggly are things?
+Smoothing parameter selection
+==============================
+
+- Many methods: AIC, Mallow's $C_p$, GCV, ML, REML
+- Recommendation, based on simulation and practice:
+  - Use REML or ML
+  - Reiss \& Ogden (2009), Wood (2011)
+  
+<img src="images/remlgcv.png">
+
+
+Maximum wiggliness
 ========================
 
 - We can set **basis complexity** or "size" ($k$)
@@ -290,103 +291,179 @@ How wiggly are things?
 - Smooths have **effective degrees of freedom** (EDF)
 - EDF < $k$
 - Set $k$ "large enough"
+  - Penalty does the rest
 
-Okay, that was a lot of theory...
-==================================
+
+More on this in a bit...
+
+uhoh
+======
+title: none
 type:section
 
-Fitting GAMs using dsm
+<p align="center"><img width=150% alt="spock sobbing mathematically" src="images/mathematical_sobbing.jpg"></p>
+
+GAM summary
+===========
+
+- Straight lines suck
+- Want wiggles
+- Use little functions (**basis functions**) to make big functions (**smooths**)
+- Need to make sure your smooths are **wiggly enough**
+- Use a **penalty** to trade off wiggliness/generality 
+
+
+Fitting GAMs in practice
 =========================
 type:section
 
 Translating maths into R
 ==========================
 
+A simple example:
+
 $$
-n_j = A_j\hat{p}_j \exp\left[ \beta_0 + s(\text{y}_j) \right] + \epsilon_j
+y_i = \beta_0 + s(x) + s(w) + \epsilon_i
 $$
-<br/>
-where $\epsilon_j \sim N(0, \sigma^2)$, $\quad n_j\sim$ count distribution
-<br/>
-- inside the link: `formula=count ~ s(y)`
-- response distribution: `family=nb()` or `family=tw()`
-- detectability: `ddf.obj=df_hr`
-- offset, data: `segment.data=segs, observation.data=obs` 
+
+where $\epsilon_i \sim N(0, \sigma^2)$
+
+Let's pretend that $y_i \sim \text{Normal}$
+
+- inside the link: `formula = y ~ s(x) + s(w)`
+- response distribution: `family=gaussian()`
+- data: `data=some_data_frame` 
+
+Putting that together
+======================
+
+```{r echo=TRUE, eval=FALSE}
+my_model <- gam(y ~ s(x) + s(w),
+                family = gaussian(),
+                data = some_data_frame,
+                method = "REML")
+```
+
+- `method="REML"` uses REML for smoothness selection (default is `"GCV.Cp"`)
+
+What about a practical example?
+================================
+type:section
 
 
-Your first DSM
-===============
+Pantropical spotted dolphins
+==============================
+
+- Example taken from Miller et al (2013)
+- [Paper appendix](http://distancesampling.org/R/vignettes/mexico-analysis.html) has a better analysis
+- Simple example here, ignoring all kinds of important stuff!
+
+![a pantropical spotted dolphin doing its thing](images/spotteddolphin_swfsc.jpg)
+
+
+Inferential aims
+=================
 
 ```{r loaddat}
-load("../spermwhale-analysis/df-models.RData")
-load("../spermwhale-analysis/sperm-data.RData")
+load("../data/mexdolphins/mexdolphins.RData")
 ```
+
+```{r gridplotfn}
+library(rgdal)
+library(rgeos)
+library(maptools)
+library(plyr)
+library(viridis)
+# fill must be in the same order as the polygon data
+grid_plot_obj <- function(fill, name, sp){
+
+  # what was the data supplied?
+  names(fill) <- NULL
+  row.names(fill) <- NULL
+  data <- data.frame(fill)
+  names(data) <- name
+
+  spdf <- SpatialPolygonsDataFrame(sp, data)
+  spdf@data$id <- rownames(spdf@data)
+  spdf.points <- fortify(spdf, region="id")
+  spdf.df <- join(spdf.points, spdf@data, by="id")
+
+  # seems to store the x/y even when projected as labelled as
+  # "long" and "lat"
+  spdf.df$x <- spdf.df$long
+  spdf.df$y <- spdf.df$lat
+
+  geom_polygon(aes_string(x="x",y="y",fill=name, group="group"), data=spdf.df)
+}
+```
+
+- How many dolphins are there?
+- Where are the dolphins?
+- What are they interested in?
+
+```{r spatialEDA, fig.cap="", fig.width=15}
+
+# some nearby states, transformed
+#map_dat <- map_data("state",c("mississippi","florida", "louisiana", "georgia",
+#                              "alabama", "texas"))
+library(mapdata)
+map_dat <- map_data("worldHires",c("usa","mexico"))
+lcc_proj4 <- CRS("+proj=lcc +lat_1=20 +lat_2=60 +lat_0=40 +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs ")
+map_sp <- SpatialPoints(map_dat[,c("long","lat")])
+
+# give the sp object a projection
+proj4string(map_sp) <-CRS("+proj=longlat +datum=WGS84")
+# re-project
+map_sp.t <- spTransform(map_sp, CRSobj=lcc_proj4)
+map_dat$x <- map_sp.t$long
+map_dat$y <- map_sp.t$lat
+
+pred.polys <- spTransform(pred_latlong, CRSobj=lcc_proj4) 
+p <- ggplot() +
+      grid_plot_obj(preddata$depth, "Depth", pred.polys) + 
+      geom_line(aes(x, y, group=Transect.Label), data=mexdolphins) +
+      geom_polygon(aes(x=x, y=y, group = group), fill = "#1A9850", data=map_dat) +
+      geom_point(aes(x, y, size=count),
+                 data=mexdolphins[mexdolphins$count>0,],
+                 colour="red", alpha=I(0.7)) +
+      coord_fixed(ratio=1, ylim = range(mexdolphins$y), xlim = range(mexdolphins$x)) +
+      scale_fill_viridis() +
+      labs(fill="Depth",x="x",y="y",size="Count") +
+      theme_minimal()
+#p <- p + gg.opts
+print(p)
+```
+
+A simple dolphin model
+===============
+
 ```{r firstdsm, echo=TRUE}
-library(dsm)
-dsm_x_tw <- dsm(count~s(x), ddf.obj=df_hr,
-                segment.data=segs, observation.data=obs,
-                family=tw(), method="REML")
+library(mgcv)
+dolphins_depth <- gam(count ~ s(depth) + offset(off.set),
+                data = mexdolphins,
+                family = quasipoisson(), method = "REML")
 ```
 
-(`method="REML"` uses REML to select the smoothing parameter)
-
-`dsm` is based on `mgcv` by Simon Wood
 
 What did that do?
 ===================
 
 ```{r echo=TRUE}
-summary(dsm_x_tw)
+summary(dolphins_depth)
 ```
 
 Plotting
 ================
 
 ```{r plotsmooth}
-plot(dsm_x_tw)
+plot(dolphins_depth)
 ```
 ***
-- `plot(dsm_x_tw)`
+- `plot(dolphins_depth)`
 - Dashed lines indicate +/- 2 standard errors
 - Rug plot
 - On the link scale
 - EDF on $y$ axis
-
-
-Adding a term
-===============
-
-- Just use `+`
-```{r xydsm, echo=TRUE}
-dsm_xy_tw <- dsm(count ~ s(x) + s(y),
-                 ddf.obj=df_hr,
-                 segment.data=segs, observation.data=obs,
-                 family=tw(), method="REML")
-```
-
-Summary
-===================
-
-```{r echo=TRUE}
-summary(dsm_xy_tw)
-```
-
-Plotting
-================
-
-```{r plotsmooth-xy, fig.width=12, echo=TRUE}
-plot(dsm_xy_tw, scale=0, pages=1)
-```
-- `scale=0`: each plot on different scale
-- `pages=1`: plot together
-
-
-Bivariate terms
-================
-
-- Assumed an additive structure
-- No interaction
-- We can specify `s(x,y)` (and `s(x,y,z,...)`)
 
 Thin plate regression splines
 ================================
@@ -397,218 +474,284 @@ Thin plate regression splines
 - Fitting on reduced problem
 - Multidimensional
 
-Thin plate splines (2-D)
-====================
 
-<img src="images/tprs.png" alt="Thin plate regression spline basis functions. Taken from Wood 2006.">
+Bivariate terms
+================
+
+- Assumed an additive structure
+- No interaction
+- We can specify `s(x,y)` (and `s(x,y,z,...)`)
+- (Assuming isotropy here...)
 
 
-Bivariate spatial term
-=======================
+Adding a term
+===============
 
-```{r xy-biv-dsm, echo=TRUE}
-dsm_xyb_tw <- dsm(count ~ s(x, y),
-                 ddf.obj=df_hr,
-                 segment.data=segs, observation.data=obs,
+- Add a surface for location ($x$ and $y$)
+- Just use `+`
+
+```{r xydsm, echo=TRUE}
+dolphins_depth_xy <- gam(count ~ s(depth) + s(x, y) + offset(off.set),
+                 data = mexdolphins,
                  family=tw(), method="REML")
 ```
+
 
 Summary
 ===================
 
 ```{r echo=TRUE}
-summary(dsm_xyb_tw)
+summary(dolphins_depth_xy)
 ```
 
-Plotting... erm...
+Plotting
 ================
 
-```{r plotsmooth-xy-biv}
-plot(dsm_xyb_tw)
+```{r plotsmooth-xy, fig.width=12, echo=TRUE}
+plot(dolphins_depth_xy, scale=0, pages=1)
+```
+- `scale=0`: each plot on different scale
+- `pages=1`: plot together
+
+
+Plotting 2d terms... erm...
+================
+
+```{r plotsmooth-xy-biv, fig.width=12}
+plot(dolphins_depth_xy, select=2, cex=2, asp=1)
 ```
 
 Let's try something different
 ===============================
 
-```{r visgam, echo=TRUE}
-vis.gam(dsm_xyb_tw, view=c("x","y"), plot.type="contour", too.far=0.1, asp=1)
+```{r visgam, echo=TRUE, fig.width=10}
+vis.gam(dolphins_depth_xy, view=c("x","y"), plot.type="contour", too.far=0.1, asp=1)
 ```
-- Still on link scale
+- Still on link scale, *just* $x$ and $y$ plotted
 - `too.far` excludes points far from data
 
-Comparing bivariate and additive models
-========================================
 
-```{r xy-x-y, fig.width=15}
-dsm_xy_nb <- dsm(count~s(x,y),
-                 ddf.obj=df_hr,
-                 segment.data=segs, observation.data=obs,
-                 family=nb(), method="REML")
-dsm_x_y_nb <- dsm(count~s(x) +s(y),
-                  ddf.obj=df_hr,
-                  segment.data=segs, observation.data=obs,
-                  family=nb(), method="REML")
-par(mfrow=c(1,2))
-vis.gam(dsm_xy_nb, plot.type = "contour", view=c("x","y"), zlim = c(-11,1), too.far=0.1, asp=1, main="Bivariate")
-vis.gam(dsm_x_y_nb, plot.type = "contour", view=c("x","y"), zlim = c(-11,1), too.far=0.1, asp=1, main="Additive")
-```
+Fitting a GAM summary
+=====================
 
-Model checking
-===============
-type:section
-
-<br/>
-<br/>
-*"perhaps the most important part of applied statistical modelling"*
-
-Simon Wood
-
-Model checking
-===============
-
-- As with detection function, checking is important
-- Want to know the model conforms to assumptions
-- What assumptions should we check?
-
-What to check
-===============
-
-- Convergence (not usually an issue)
-- Basis size is big enough
-- Residuals
+- `gam` does all the work
+- very similar to `glm`
+- `s` indicates a smooth term
+- `plot` can give you good 1D plots
+- `vis.gam` for 2D
 
 
-Basis size
+Prediction
 ===========
 type:section
 
-Basis size (k)
-===========
+What is a prediction?
+=====================
 
-- Set `k` per term
-- e.g. `s(x, k=10)` or `s(x, y, k=100)`
-- Penalty removes "extra" wigglyness
-  - *up to a point!*
-- (But computation is slower with bigger `k`)
+- Evaluate the model, at a particular covariate combination
+- Answering (e.g.) the question "at a given depth, how many dolphins?"
+- Steps:
+  1. evaluate the $s(\ldots)$ terms
+  2. move to the response scale (exponentiate? Do nothing?)
+  3. (multiply any offset etc)
 
-Checking basis size
-====================
+Example of prediction
+======================
 
-```{r gamcheck-text, fig.keep="none", echo=TRUE}
-gam.check(dsm_x_tw)
+- in maths:
+  - Model: $\text{count}_i = A_i \exp \left( \beta_0 + s(x_i, y_i) + s(\text{Depth}_i)\right)$
+  - Drop in the values of $x, y, \text{Depth}$ (and $A$)
+- in R:
+  - build a `data.frame` with $x, y, \text{Depth}, A$
+  - use `predict()`
+
+```{r echo=TRUE, eval=FALSE}
+preds <- predict(my_model, newdat=my_data, type="response")
 ```
 
+(`se.fit=TRUE` gives a standard error for each prediction)
 
-Increasing basis size
-====================
-
-```{r gamcheck-kplus-text, fig.keep="none", echo=TRUE}
-dsm_x_tw_k <- dsm(count~s(x, k=20), ddf.obj=df_hr,
-                  segment.data=segs, observation.data=obs,
-                  family=tw(), method="REML")
-gam.check(dsm_x_tw_k)
-```
-
-Sometimes basis size isn't the issue...
-========================================
-
-- Generally, double `k` and see what happens
-- Didn't increase the EDF much here
-- Other things can cause low "`p-value`" and "`k-index`"
-- Increasing `k` can cause problems (nullspace)
-
-
-Don't throw away your residuals!
-==================================
+Back to the dolphins...
+=======================
 type:section
 
+Where are the dolphins?
+=======================
 
-What are residuals?
-====================
-
-- Generally residuals = observed value - fitted value
-- BUT hard to see patterns in these "raw" residuals
-- Need to standardise -- **deviance residuals**
-- Residual sum of squares $\Rightarrow$ linear model
-  - deviance $\Rightarrow$ GAM
-- Expect these residuals $\sim N(0,1)$
-
-Residual checking
-===================
-
-```{r gamcheck, results="hide"}
-gam.check(dsm_x_tw)
+```{r echo=TRUE}
+dolphin_preds <- predict(dolphins_depth_xy, newdata=preddata, type="response")
 ```
 
-Shortcomings
-=============
+```{r fig.width=20}
+p <- ggplot() +
+      grid_plot_obj(dolphin_preds, "N", pred.polys) + 
+      geom_line(aes(x, y, group=Transect.Label), data=mexdolphins) +
+      geom_polygon(aes(x=x, y=y, group = group), fill = "#1A9850", data=map_dat) +
+      geom_point(aes(x, y, size=count),
+                 data=mexdolphins[mexdolphins$count>0,],
+                 colour="red", alpha=I(0.7)) +
+      coord_fixed(ratio=1, ylim = range(mexdolphins$y), xlim = range(mexdolphins$x)) +
+      scale_fill_viridis() +
+      labs(fill="Predicted\ndensity", x="x", y="y", size="Count") +
+      theme_minimal()
+print(p)
+```
 
-- `gam.check` left side can be helpful
-- Right side is victim of artifacts
-- Need an alternative
-- "Randomised quanitle residuals" (*experimental*)
-  - `rqgam.check`
-  - Exactly normal residuals (left side useless)
+(`ggplot2` code included in the slide source)
+
+Prediction summary
+==================
+
+- Evaluate the fitted model at a given point
+- Can evaluate many at once (`data.frame`)
+- Don't forget the `type=...` argument!
+- Obtain per-prediction standard error with `se.fit`
+
+What about uncertainty?
+========================
+type:section
+
+Without uncertainty, we're not doing statistics 
+========================
+type:section
+
+Where does uncertainty come from?
+=================================
+
+- $\boldsymbol{\beta}$: uncertainty in the spline parameters
+- $\boldsymbol{\lambda}$: uncertainty in the smoothing parameter
+
+- Traditionally we've only addressed the former
+- New tools let us address the latter...
+
+
+Parameter uncertainty
+=======================
+
+From theory:
+
+$$
+\boldsymbol{\beta} \sim N(\hat{\boldsymbol{\beta}},  \mathbf{V}_\boldsymbol{\beta})
+$$
+
+(*caveat: the normality is only* **approximate** *for non-normal response*)
+
+
+**What does this mean?** Variance for each parameter.
+
+In `mgcv`: `vcov(model)` returns $\mathbf{V}_\boldsymbol{\beta}$.
+
+
+What can we do this this?
+===========================
+
+- confidence intervals in `plot`
+- standard errors using `se.fit`
+- derived quantities? (see bibliography)
+
+blah
+====
+title:none
+type:section
+
+<img src="images/tina-modelling.png">
 
 
 
-Randomised quantile residuals
+The lpmatrix, magic, etc
 ==============================
 
+For regular predictions:
 
-```{r rqgamcheck}
-rqgam.check(dsm_x_tw)
+$$
+\hat{\boldsymbol{\eta}}_p = L_p \hat{\boldsymbol{\beta}}
+$$
+
+form $L_p$ using the prediction data, evaluating basis functions as we go.
+
+(Need to apply the link function to $\hat{\boldsymbol{\eta}}_p$)
+
+But the $L_p$ fun doesn't stop there...
+
+[[mathematics intensifies]]
+============================
+type:section
+
+Variance and lpmatrix
+======================
+
+To get variance on the scale of the linear predictor:
+
+$$
+V_{\hat{\boldsymbol{\eta}}} = L_p^\text{T} V_\hat{\boldsymbol{\beta}} L_p
+$$
+
+pre-/post-multiplication shifts the variance matrix from parameter space to linear predictor-space.
+
+(Can then pre-/post-multiply by derivatives of the link to put variance on response scale)
+
+Simulating parameters
+======================
+
+- $\boldsymbol{\beta}$ has a distribution, we can simulate
+
+```{r results="hide"}
+library(mvtnorm)
+
+# get the Lp matrix
+Lp <- predict(dolphins_depth_xy, newdata=preddata, type="lpmatrix")
+
+# how many realisations do we want?
+frames <- 100
+
+# generate the betas from the GAM "posterior"
+betas <- rmvnorm(frames, coef(dolphins_depth_xy), vcov(dolphins_depth_xy))
+
+
+# use a function to get animation to play nice...
+anim_map <- function(){
+  # loop to make plots
+  for(frame in 1:frames){
+
+    # make the prediction
+    preddata$preds <- preddata$area * exp(Lp%*%betas[frame,])
+
+    # plot it (using viridis)
+    p <- ggplot() +
+          grid_plot_obj(preddata$preds, "N", pred.polys) + 
+          geom_polygon(aes(x=x, y=y, group = group), fill = "#1A9850", data=map_dat) +
+          coord_fixed(ratio=1, ylim = range(mexdolphins$y),
+                      xlim = range(mexdolphins$x)) +
+          scale_fill_viridis(limits=c(0,200)) +
+          labs(fill="Predicted\ndensity",x="x",y="y",size="Count") +
+          theme_minimal()
+    
+    print(p)
+  }
+}
+
+# make the animation!
+saveGIF(anim_map(), "uncertainty.gif", outdir = "new", interval = 0.15, ani.width = 800, ani.height = 400)
 ```
 
-Residuals vs. covariates
-=========================
+![Animation of uncertainty](uncertainty.gif)
 
-```{r covar-resids, fig.width=12}
-library(statmod)
-par(mfrow=c(1,2))
-plot(dsm_x_tw$data$x, residuals(dsm_x_tw), ylab="Deviance residuals", xlab="x")
-environment(dsm_x_tw$family$variance)$p <- dsm_x_tw$family$getTheta(TRUE)
-plot(dsm_x_tw$data$x, qres.tweedie(dsm_x_tw), ylab="Randomised quantile residuals", xlab="x")
-```
+Uncertainty in smoothing parameter
+==================================
 
-Residuals vs. covariates (boxplots)
-=========================
+- Recent work by Simon Wood
+- "smoothing parameter uncertainty corrected" version of $V_\hat{\boldsymbol{\beta}}$
+- In a fitted model, we have:
+  - `$Vp` what we got with `vcov`
+  - `$Vc` the corrected version
+- Still experimental
 
-```{r covar-resids-boxplot, fig.width=12}
-library(statmod)
-par(mfrow=c(1,2))
-
-resid_dat <- data.frame(x     = dsm_x_tw$data$x,
-                        x_cut = cut(dsm_x_tw$data$x,
-                                    seq(min(dsm_x_tw$data$x),
-                                        max(dsm_x_tw$data$x),
-                                        len=20)),
-                        dres  = residuals(dsm_x_tw),
-                        qres  = qres.tweedie(dsm_x_tw))
-
-plot(dres~x_cut, data=resid_dat, ylab="Deviance residuals", xlab="x")
-plot(qres~x_cut, data=resid_dat, ylab="Randomised quantile residuals", xlab="x")
-```
-
-Example of "bad" plots
-=======================
-
-![Bad residual check plot from Wood 2006](images/badgam.png)
-
-Example of "bad" plots
-=======================
-
-![Bad residual check plot from Wood 2006](images/badgam-annotate.png)
-
-Residual checks
+Variance summary
 ================
 
-- Looking for patterns (not artifacts)
-- This can be tricky
-- Need to use a mixture of techniques
-
-
-Let's have a go...
-==============================
-type:section
+- Everything comes from variance of parameters
+- Need to re-project/scale them to get the quantities we need
+- `mgcv` does most of the hard work for us
+- Fancy stuff possible with a little maths
+- Can include uncertainty in the smoothing parameter too
 
