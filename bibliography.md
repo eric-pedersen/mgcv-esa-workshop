@@ -20,6 +20,7 @@ Here we'll list some useful papers and books on the topics covered in the course
 
 
 - Wood, S. N. (2003). Thin plate regression splines. Journal of the Royal Statistical Society: Series B (Statistical Methodology).
+- Reiss, P. T., & Ogden, R. T. (2009). Smoothing parameter selection for a class of semiparametric linear models. Journal of the Royal Statistical Society: Series B (Statistical Methodology), 71(2), 505–523.
 - Wood, S. N. (2011). Fast stable restricted maximum likelihood and marginal likelihood estimation of semiparametric generalized linear models. Journal of the Royal Statistical Society: Series B (Statistical Methodology), 73(1), 3–36. [http://doi.org/10.1111/j.1467-9868.2010.00749.x](http://doi.org/10.1111/j.1467-9868.2010.00749.x)
 - Wood, S. N., Pya, N., & Säfken, B. (2016). Smoothing parameter and model selection for general smooth models. Journal of the American Statistical Association, 1–45. [http://doi.org/10.1080/01621459.2016.1180986](http://doi.org/10.1080/01621459.2016.1180986)
 
