@@ -1,6 +1,6 @@
-Preamble
+The mgcv package as a one-stop-shop for fitting non-linear ecological models
 ============================
-author: Dave, Eric and Gavin
+author: David L Miller, Eric Pedersen, and Gavin Simpson
 css: custom.css
 transition: none
 
@@ -10,12 +10,65 @@ Good morning!
 type: section
 
 
-Stuff to cover here:
 
-- Logistics
-  - where is the coffee?
-  - where is the bathroom?
-  - what if there is a fire?
-- Who are we?
-- Who are you?
-- What is the structure of the day?
+Logistics
+==========
+- where is the coffee?
+- where is the bathroom?
+- what if there is a fire?
+
+Who are we?
+===========
+type:section
+
+
+Eric Pedersen
+=============
+
+Gavin Simpson
+=============
+
+David L Miller
+===============
+
+- Cetacean distribution modelling
+- Spatial modelling (esp. model checking)
+- Distance sampling [distancesampling.org](http://distancesampling.org)
+- Statistical software (`Distance`, `mrds`, `dsm`)
+- Trying to shoehorn all projects into `mgcv`
+
+
+Who are you?
+============
+type:section
+
+
+What is the structure of the day?
+=================================
+type:section
+
+Timing
+======
+
+- 8am to 5pm
+- Morning session: 8am-12pm
+- Aternoon session: 1pm-5pm
+
+Schedule
+=========
+
+Time       | Thing
+-----------|--------------------
+0800-0815  | Intro
+0815-0945  | Generalized Additive Models
+Model checking
+Model selection
+Beyond the exponential family
+Smoother zoo
+Extended examples/demos
+
+
+
+
+
+
