@@ -71,54 +71,44 @@ title: Course outline
 - Count data: Tweedie, negative binomial & ZIP (Dave)
 - Beta regression (Gavin)
 - Other stuff: t, `cox.ph`, ordered categorical, mvnorm (Eric)
-* Big list o' distributions (examples)
 
 # Afternoon
-
-## Smoother zoo
-
-* 2-D smoothers `s()` and `te()`
-  - soap film
-  - `"ts"`
-* Cyclic splines
-* `fs` basis/`by=`
-* random effects
-- Gaussian process smoothers?
-
 
 ## Extended examples/demos (all)
 
 Introduce a set of examples, let people pick what they want. Workbook-type situation.
 
-- Spatial modelling (Example)
-  - Fisheries -- effectively quadrats (Dave/Eric)
-- Time series modelling (Example)
-  - `lynx` (non-linear autoregressive)
-  - central England temperature series -- tensor (Gavin)
-  - Gaussian data?
+- Spatial modelling
+  - Dolphins (Dave) (Example)
 - Spatio-temporal models
-  - Demo? (Computational time)
-  - Kodiak whale data? Blue ling? Whiting? (Dave)
-  - Lake cores (Gavin)
-- Location-scale models (Demo)
+  - Trawl data from ERDDAP (Eric) (Example)
+  - Lake cores (Gavin) (Demo)
+- Time series modelling
+  - `lynx` (Eric) (Example)
+  - Ft Lauderdale (Eric) (Example)
+  - Ft Lauderdale `ti()` (Gavin) (Example)
+- Markov random fields
+  - forest health data (Gavin) (Example)
+- `"lpmatrix"`
+  - dolphins revisit (Dave) (Example)
+- random effects
+  - cheetahs (Gavin)
+  - ship effect trawl (Eric)
+- Location-scale models? (Demo)
   - Quick example (Gavin)
-- Markov random fields (Demo)
-  - forest health data (Fahrmir)
-  - model lakes connected by streams?
-- `"lpmatrix"` (Dave/Gavin)
-  - show the multiple possible realisations earlier on but explain them here
-  - uncertainty about some summary (sum, derivatives etc)
-  - generation of betas from the normal distn etc
-- random effects (Dave) (quick)
-  - `"re"`
-  - `paraPen`
 
 
+## Smoother zoo checklist
 
-# Data
+- [ ] 2-D smoother `s()` (Dave intro example)
+- [ ] `te()`
+- [ ] soap film (Dave spatial dolphins)
+- [ ] `"ts"` (Gavin model selection)
+- [ ] Cyclic splines
+- [ ] `fs` basis/`by=`
+- [ ] random effects
+- [ ] Gaussian process smoothers?
+- [ ] multiple formulae specification?
 
-- `lynx`
-- breeding bird survey?
-  - time series per site (univariate, bells and whistles)
-  - spatial snapshot (spatial, bivariate)
+
 
