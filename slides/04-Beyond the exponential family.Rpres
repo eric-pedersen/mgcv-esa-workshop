@@ -1,0 +1,143 @@
+Beyond the exponential family
+============================
+author: Eric Pedersen, Gavin Simpson, David Miller
+date: August 6th, 2016
+css: custom.css
+transition: none
+
+
+Away from the exponential family
+===================================
+
+```{r setup, include=F}
+
+library(mgcv)
+library(magrittr)
+library(ggplot2)
+library(dplyr)
+library(statmod)
+
+```
+
+```{r pres_setup, include =F}
+library(knitr)
+opts_chunk$set(cache=TRUE, echo=FALSE,fig.align="center")
+```
+
+
+
+
+Modelling Zeros
+================
+type:section
+
+
+Modelling proportions
+======================
+type:section 
+
+The Beta distribution
+======================
+
+
+
+Modelling outliers
+====================
+type:section
+
+The student-t distribution
+============================
+- Models continuous data w/ longer tails than normal
+- Far less sensitive to outliers
+- Has one extra parameter: df. 
+- bigger df: t dist approaches normal
+
+
+
+
+```{r tplot,fig.width=15, fig.height=6}
+set.seed(2)
+dat = data.frame(df = rep(c(2,4,50),each=500))
+dat$x = rt(1500,df=dat$df)
+dat$df_val = paste("df = ",dat$df, sep ="")
+x_val = seq(min(dat$x),max(dat$x), length=200)
+ggplot(aes(x=x),data=dat)+
+  geom_density(col="red")+
+  facet_grid(.~df_val)+
+  annotate(x=x_val,y=dnorm(x_val), geom = "line")+
+  theme_bw(base_size = 20)
+```
+
+
+
+
+The student-t distribution: Usage
+============================
+```{r texample, eval=FALSE,echo=T}
+set.seed(4)
+n=250
+dat = data.frame(x=seq(0,10,length=n))
+dat$f = 20*exp(-dat$x)*dat$x
+dat$y  = 1*rt(n,df = 3) + dat$f
+norm_mod =  gam(y~s(x,k=20), data=dat, family=gaussian(link="identity"))
+t_mod = gam(y~s(x,k=20), data=dat, family=scat(link="identity"))
+predict_norm = predict(norm_mod,se.fit=T)
+predict_t = predict(t_mod,se.fit=T)
+fit_vals = data.frame(x = c(dat$x,dat$x), 
+                      fit =c(predict_norm[[1]],predict_t[[1]]),
+                      se_min = c(predict_norm[[1]] - 2*predict_norm[[2]],
+                                 predict_t[[1]] - 2*predict_t[[2]]),
+                      se_max = c(predict_norm[[1]] + 2*predict_norm[[2]],
+                                 predict_t[[1]] + 2*predict_t[[2]]),
+                      model = rep(c("normal errors","t-errors"),each=n))
+ggplot(aes(x=x,y=fit),data=fit_vals)+
+  facet_grid(.~model)+
+  geom_line()+
+  geom_ribbon(aes(ymin =se_min,ymax = se_max),alpha=0.5)+
+  annotate(x = dat$x,y=dat$y,size=2,geom="point")+
+  annotate(x = dat$x,y=dat$f,size=2,geom="line")+
+  theme_bw(20)
+```
+
+The student-t distribution: Usage
+============================
+```{r texample2, include =T,echo=F, fig.width=15, fig.height=8}
+set.seed(4)
+n=250
+dat = data.frame(x=seq(0,10,length=n))
+dat$f = 20*exp(-dat$x)*dat$x
+dat$y  = 1*rt(n,df = 3) + dat$f
+norm_mod =  gam(y~s(x,k=20), data=dat, family=gaussian(link="identity"))
+t_mod = gam(y~s(x,k=20), data=dat, family=scat(link="identity"))
+predict_norm = predict(norm_mod,se.fit=T)
+predict_t = predict(t_mod,se.fit=T)
+fit_vals = data.frame(x = c(dat$x,dat$x), 
+                      fit =c(predict_norm[[1]],predict_t[[1]]),
+                      se_min = c(predict_norm[[1]] - 2*predict_norm[[2]],
+                                 predict_t[[1]] - 2*predict_t[[2]]),
+                      se_max = c(predict_norm[[1]] + 2*predict_norm[[2]],
+                                 predict_t[[1]] + 2*predict_t[[2]]),
+                      model = rep(c("normal errors","t-errors"),each=n))
+ggplot(aes(x=x,y=fit),data=fit_vals)+
+  facet_grid(.~model)+
+  geom_line()+
+  geom_ribbon(aes(ymin =se_min,ymax = se_max),alpha=0.5)+
+  annotate(x = dat$x,y=dat$y,size=2,geom="point")+
+  annotate(x = dat$x,y=dat$f,size=2,geom="line")+
+  theme_bw(20)
+```
+
+
+
+The student-t distribution: Usage
+============================
+```{r texample3, include =T}
+summary(t_mod)
+```
+
+
+
+
+Modelling multi-dimensional data 
+===========================
+type:section
