@@ -11,6 +11,7 @@ Overview
 - What is a GAM?
 - What is smoothing?
 - How do GAMs work? (*Roughly*)
+- Fitting and plotting simple models
 
 ```{r setup, include=FALSE}
 library(knitr)
@@ -58,28 +59,68 @@ Why bother with anything more complicated?!
 =============================
 type:section
 
-blah
+Is this linear?
 =============================
 
-[placeholder for everything going wrong]
+```{r islinear, fig.width=12, fig.height=6}
+set.seed(2) ## simulate some data...
+dat <- gamSim(1, n=400, dist="normal", scale=1, verbose=FALSE)
+dat <- dat[,c("y", "x0", "x1", "x2", "x3")]
+p <- ggplot(dat,aes(y=y,x=x1)) +
+      geom_point() +
+      theme_minimal()
+print(p)
+```
+
+Is this linear? Maybe?
+=============================
+
+```{r eval=FALSE, echo=TRUE}
+lm(y ~ x1, data=dat)
+```
+
+
+```{r maybe, fig.width=12, fig.height=6}
+p <- ggplot(dat, aes(y=y, x=x1)) + geom_point() +
+      theme_minimal()
+print(p + geom_smooth(method="lm"))
+```
+
+
 
 What can we do?
 =============================
 type:section
 
-
-blah
+Adding a quadratic term?
 =============================
 
-[placeholder for doing the dumb quadratic thing]
+```{r eval=FALSE, echo=TRUE}
+lm(y ~ x1 + poly(x1, 2), data=dat)
+```
+
+```{r quadratic, fig.width=12, fig.height=6}
+p <- ggplot(dat, aes(y=y, x=x1)) + geom_point() +
+      theme_minimal()
+print(p + geom_smooth(method="lm", formula=y~x+poly(x, 2)))
+```
+
+
+
 
 Is this sustainable?
 =============================
 
-- Adding in quadratic *can* make sense
-- We can add higher terms
+- Adding in quadratic (and higher terms) *can* make sense
 - This feels a bit *ad hoc*
-- Wouldn't it be better if we had a **framework** to deal with these issues?
+- Better if we had a **framework** to deal with these issues?
+
+```{r ruhroh, fig.width=12, fig.height=6}
+p <- ggplot(dat, aes(y=y, x=x2)) + geom_point() +
+      theme_minimal()
+print(p + geom_smooth(method="lm", formula=y~x+poly(x, 2)))
+```
+
 
 [drumroll]
 =============================
@@ -104,12 +145,11 @@ Okay, but what about these "s" things?
 right:45%
 
 ```{r smoothdat, fig.width=9, fig.height=6}
-set.seed(2) ## simulate some data...
-dat <- gamSim(1,n=400,dist="normal",scale=1, verbose=FALSE)
-dat <- dat[,c("y","x0","x1","x2","x3")]
+
 spdat <- melt(dat, id.vars = c("y"))
 p <- ggplot(spdat,aes(y=y,x=value)) +
       geom_point() +
+      theme_minimal() +
       facet_wrap(~variable, nrow=1)
 print(p)
 ```
@@ -124,8 +164,7 @@ Okay, but what about these "s" things?
 right:45%
 
 ```{r wsmooths, fig.width=9, fig.height=6}
-p <- p + geom_smooth()
-print(p)
+print(p + geom_smooth())
 ```
 ***
 - Think $s$=**smooth**
@@ -173,6 +212,15 @@ Splines
 - Makes the math(s) much easier
 
 <img src="images/addbasis.png">
+
+Design matrices
+===============
+
+- We often write models as $X\boldsymbol{\beta}$
+- $X$ is our data
+- $\boldsymbol{\beta}$ are parameters we need to estimate
+- For a GAM it's the same
+- $X$ has columns for each basis, evaluated at each observation
 
 Measuring wigglyness
 ======================
@@ -440,10 +488,14 @@ A simple dolphin model
 ```{r firstdsm, echo=TRUE}
 library(mgcv)
 dolphins_depth <- gam(count ~ s(depth) + offset(off.set),
-                data = mexdolphins,
-                family = quasipoisson(), method = "REML")
+                      data = mexdolphins,
+                      family = quasipoisson(),
+                      method = "REML")
 ```
 
+- count is a function of depth
+- `off.set` is the effort expended
+- we have count data, try quasi-Poisson distribution
 
 What did that do?
 ===================
@@ -473,6 +525,7 @@ Thin plate regression splines
 - Reduce # basis functions (eigendecomposition)
 - Fitting on reduced problem
 - Multidimensional
+- Wood (2003)
 
 
 Bivariate terms
@@ -481,14 +534,14 @@ Bivariate terms
 - Assumed an additive structure
 - No interaction
 - We can specify `s(x,y)` (and `s(x,y,z,...)`)
-- (Assuming isotropy here...)
+- (Assuming *isotropy* here...)
 
 
 Adding a term
 ===============
 
-- Add a surface for location ($x$ and $y$)
-- Just use `+`
+- Add a **surface** for location ($x$ and $y$)
+- Just use `+` for an extra term
 
 ```{r xydsm, echo=TRUE}
 dolphins_depth_xy <- gam(count ~ s(depth) + s(x, y) + offset(off.set),
@@ -517,28 +570,39 @@ plot(dolphins_depth_xy, scale=0, pages=1)
 Plotting 2d terms... erm...
 ================
 
-```{r plotsmooth-xy-biv, fig.width=12}
-plot(dolphins_depth_xy, select=2, cex=2, asp=1)
+```{r plotsmooth-xy-biv, fig.width=15, fig.height=7, echo=TRUE}
+plot(dolphins_depth_xy, select=2, cex=2, asp=1, lwd=2)
 ```
+
+- `select=` picks which smooth to plot
 
 Let's try something different
 ===============================
 
-```{r visgam, echo=TRUE, fig.width=10}
-vis.gam(dolphins_depth_xy, view=c("x","y"), plot.type="contour", too.far=0.1, asp=1)
+```{r plot-scheme2, echo=TRUE, fig.width=10}
+plot(dolphins_depth_xy, select=2, cex=2, asp=1, lwd=2, scheme=2)
 ```
-- Still on link scale, *just* $x$ and $y$ plotted
-- `too.far` excludes points far from data
+- `scheme=2` much better for bivariate terms
+- `vis.gam()` is much more general
+
+More complex plots
+===================
+
+```{r visgam, fig.width=15, echo=TRUE}
+par(mfrow=c(1,2))
+vis.gam(dolphins_depth_xy, view=c("depth","x"), too.far=0.1, phi=30, theta=45)
+vis.gam(dolphins_depth_xy, view=c("depth","x"), plot.type="contour", too.far=0.1,asp=1/1000)
+```
 
 
-Fitting a GAM summary
-=====================
+Fitting/plotting GAMs summary
+=============================
 
 - `gam` does all the work
 - very similar to `glm`
 - `s` indicates a smooth term
-- `plot` can give you good 1D plots
-- `vis.gam` for 2D
+- `plot` can give simple plots
+- `vis.gam` for more advanced stuff
 
 
 Prediction
@@ -695,7 +759,7 @@ Simulating parameters
 
 - $\boldsymbol{\beta}$ has a distribution, we can simulate
 
-```{r results="hide"}
+```{r paramsim, results="hide"}
 library(mvtnorm)
 
 # get the Lp matrix
@@ -755,3 +819,16 @@ Variance summary
 - Fancy stuff possible with a little maths
 - Can include uncertainty in the smoothing parameter too
 
+Okay, that was a lot of information
+===================================
+type:section
+
+Summary
+=======
+
+- GAMs are GLMs plus some extra wiggles
+- Need to make sure things are *just wiggly enough*
+  - Basis + penalty is the way to do this
+- Fitting looks like `glm` with extra `s()` terms
+- Most stuff comes down to matrix algebra, that `mgcv` sheilds you from
+- To do fancy stuff, get inside the matrices
