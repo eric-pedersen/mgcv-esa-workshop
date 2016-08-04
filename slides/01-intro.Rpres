@@ -15,12 +15,11 @@ Overview
 
 ```{r setup, include=FALSE}
 library(knitr)
-library(magrittr)
 library(viridis)
 library(ggplot2)
 library(reshape2)
-library(dsm)
 library(animation)
+library(mgcv)
 opts_chunk$set(cache=TRUE, echo=FALSE)
 ```
 
@@ -421,7 +420,6 @@ library(rgdal)
 library(rgeos)
 library(maptools)
 library(plyr)
-library(viridis)
 # fill must be in the same order as the polygon data
 grid_plot_obj <- function(fill, name, sp){
 
