@@ -8,6 +8,17 @@ transition: none
 
 Away from the exponential family
 ===================================
+incremental: true
+
+Most glm families (Poisson, Gamma, Gaussian, Binomial) are *exponential families*
+
+$$ f(x|\theta) \sim exp(\sum_i \eta_i(\theta)T_i(x) - A(\theta))$$
+
+- Computationally easy, can find sufficient statistics
+- ... but it doesn't describe everything
+- `mgcv` has expanded to cover many new families
+- Lets you model a much wider range of scenarios with smooths
+
 
 ```{r setup, include=F}
 
@@ -25,6 +36,14 @@ opts_chunk$set(cache=TRUE, echo=FALSE,fig.align="center")
 ```
 
 
+What we'll cover
+===================================
+- Over-dispersed data: Negative binomial and Tweedie distributions
+- Modelling exta zeros with zero-inflated and adjusted families
+- Modelling proportions with the Beta distribution
+- Robust regression with the Student's t distribution
+- Ordered and unorderd categorical data
+- Multivariate normal data
 
 
 Modelling Zeros
@@ -219,3 +238,8 @@ ggplot(aes(x= x, y= obs_val),data=ocat_predict)+
   geom_line(aes(y= prediction))+
   theme_bw(30)
 ```
+
+
+
+Unordered categorical data 
+===========================
