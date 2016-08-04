@@ -94,8 +94,10 @@ Introduce a set of examples, let people pick what they want. Workbook-type situa
 - random effects
   - cheetahs (Gavin)
   - ship effect trawl (Eric)
-- Location-scale models? (Demo)
-  - Quick example (Gavin)
+- Location-scale models?
+  - Quick example (Gavin) (Demo)
+- Linear functionals
+  - dispersal kernels black spruce (Eric) (Example)
 
 
 ## Smoother zoo checklist
