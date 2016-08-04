@@ -15,7 +15,7 @@ library(mgcv)
 library(magrittr)
 library(ggplot2)
 library(dplyr)
-library(statmod)
+library(tidyr)
 
 ```
 
@@ -75,35 +75,19 @@ The student-t distribution: Usage
 ============================
 ```{r texample, eval=FALSE,echo=T}
 set.seed(4)
-n=250
+n=300
 dat = data.frame(x=seq(0,10,length=n))
 dat$f = 20*exp(-dat$x)*dat$x
 dat$y  = 1*rt(n,df = 3) + dat$f
 norm_mod =  gam(y~s(x,k=20), data=dat, family=gaussian(link="identity"))
 t_mod = gam(y~s(x,k=20), data=dat, family=scat(link="identity"))
-predict_norm = predict(norm_mod,se.fit=T)
-predict_t = predict(t_mod,se.fit=T)
-fit_vals = data.frame(x = c(dat$x,dat$x), 
-                      fit =c(predict_norm[[1]],predict_t[[1]]),
-                      se_min = c(predict_norm[[1]] - 2*predict_norm[[2]],
-                                 predict_t[[1]] - 2*predict_t[[2]]),
-                      se_max = c(predict_norm[[1]] + 2*predict_norm[[2]],
-                                 predict_t[[1]] + 2*predict_t[[2]]),
-                      model = rep(c("normal errors","t-errors"),each=n))
-ggplot(aes(x=x,y=fit),data=fit_vals)+
-  facet_grid(.~model)+
-  geom_line()+
-  geom_ribbon(aes(ymin =se_min,ymax = se_max),alpha=0.5)+
-  annotate(x = dat$x,y=dat$y,size=2,geom="point")+
-  annotate(x = dat$x,y=dat$f,size=2,geom="line")+
-  theme_bw(20)
 ```
 
 The student-t distribution: Usage
 ============================
-```{r texample2, include =T,echo=F, fig.width=15, fig.height=8}
+```{r texample2, include =T,echo=F,results= "hide", fig.width=15, fig.height=8}
 set.seed(4)
-n=250
+n=300
 dat = data.frame(x=seq(0,10,length=n))
 dat$f = 20*exp(-dat$x)*dat$x
 dat$y  = 1*rt(n,df = 3) + dat$f
@@ -120,8 +104,8 @@ fit_vals = data.frame(x = c(dat$x,dat$x),
                       model = rep(c("normal errors","t-errors"),each=n))
 ggplot(aes(x=x,y=fit),data=fit_vals)+
   facet_grid(.~model)+
-  geom_line()+
-  geom_ribbon(aes(ymin =se_min,ymax = se_max),alpha=0.5)+
+  geom_line(col="red")+
+  geom_ribbon(aes(ymin =se_min,ymax = se_max),alpha=0.5,fill="red")+
   annotate(x = dat$x,y=dat$y,size=2,geom="point")+
   annotate(x = dat$x,y=dat$f,size=2,geom="line")+
   theme_bw(20)
@@ -141,3 +125,97 @@ summary(t_mod)
 Modelling multi-dimensional data 
 ===========================
 type:section
+
+Ordered categorical data 
+===========================
+- Assumes data are in discrete categories, and categories fall in order
+- e.g.: conservation status: "least concern", "vulnerable", "endangered", "extinct"
+- fits a linear latent model using covariates, w/ threshold for each level
+- First cut-off always occurs at -1 
+
+
+Ordered categorical data 
+===========================
+```{r ocat_ex1, include =T,echo=F,results= "hide", fig.width=15, fig.height=8}
+set.seed(4)
+n= 100
+dat  = data.frame(body_size = seq(-2,2, length=200))
+dat$linear_predictor = 6*exp(dat$body_size*2)/(1+exp(dat$body_size*2))-2
+
+ggplot(aes(x=body_size, y=linear_predictor),data=dat) + 
+  annotate(x= dat$body_size, ymin=-3,ymax=-1, alpha=0.25,geom="ribbon")+
+  annotate(x= 0, y=-2, label = "least concern",geom="text",size=10)+
+  annotate(x= dat$body_size, ymin=-1,ymax=1.5, alpha=0.25,geom="ribbon",fill="red")+
+  annotate(x= 0, y=0.25, label = "vulnerable",geom="text",size=10)+
+  annotate(x= dat$body_size, ymin=1.5,ymax=2, alpha=0.25,geom="ribbon",fill="blue")+
+  annotate(x= 0, y=1.75, label = "endangered",geom="text",size=10)+
+  annotate(x= 0, y=3.5, label = "extinct",geom="text",size=10)+
+  scale_y_continuous("linear predictor", expand=c(0,0),limits=c(-3,5))+
+  scale_x_continuous("relative body size", expand=c(0,0))+
+  theme_bw(30)+
+  theme(panel.grid = element_blank())
+
+```
+
+
+Ordered categorical data 
+===========================
+```{r ocat_ex2, include =T,echo=F,results= "hide", fig.width=15, fig.height=8}
+set.seed(4)
+n= 100
+dat  = data.frame(body_size = seq(-2,2, length=200))
+dat$linear_predictor = 6*exp(dat$body_size*2)/(1+exp(dat$body_size*2))-2
+
+ggplot(aes(x=body_size, y=linear_predictor),data=dat) + 
+  geom_line()+
+  geom_ribbon(aes(ymin=linear_predictor-1,ymax=linear_predictor+1),alpha=0.25)+
+  annotate(x= dat$body_size, ymin=-3,ymax=-1, alpha=0.25,geom="ribbon")+
+  annotate(x= 0, y=-2, label = "least concern",geom="text",size=10)+
+  annotate(x= dat$body_size, ymin=-1,ymax=1.5, alpha=0.25,geom="ribbon",fill="red")+
+  annotate(x= 0, y=0.25, label = "vulnerable",geom="text",size=10)+
+  annotate(x= dat$body_size, ymin=1.5,ymax=2, alpha=0.25,geom="ribbon",fill="blue")+
+  annotate(x= 0, y=1.75, label = "endangered",geom="text",size=10)+
+  annotate(x= 0, y=3.5, label = "extinct",geom="text",size=10)+
+  scale_x_continuous("relative body size", expand=c(0,0))+
+  scale_y_continuous("linear predictor",limits=c(-3,5), expand=c(0,0))+
+  theme_bw(30)+
+  theme(panel.grid = element_blank())
+
+```
+
+
+Using ocat
+===========================
+```{r ocat_ex3, include =T,echo=T,results= "hide", fig.width=15, fig.height=5}
+n= 200
+dat = data.frame(x1 = runif(n,-1,1),x2=2*pi*runif(n))
+dat$f = dat$x1^2 + sin(dat$x2)
+dat$y_latent = dat$f + rnorm(n,dat$f)
+dat$y = ifelse(dat$y_latent<0,1, ifelse(dat$y_latent<0.5,2,3))
+ocat_model = gam(y~s(x1)+s(x2), family=ocat(R=3),data=dat)
+plot(ocat_model,page=1)
+```
+
+Using ocat
+===========================
+```{r ocat_ex4, include =T,echo=T, fig.width=15, fig.height=8}
+summary(ocat_model)
+```
+
+Using ocat
+===========================
+```{r ocat_ex5, include =T,echo=F,results= "hide", fig.width=15, fig.height=8}
+ocat_predict = predict(ocat_model,type = "response")
+colnames(ocat_predict) = c("1","2","3")
+ocat_predict = as.data.frame(ocat_predict)%>%
+  mutate(x= fitted(ocat_model),y=dat$y)%>%
+  gather(pred_level,prediction,`1`:`3`)%>%
+  mutate(pred_level = as.numeric(pred_level),
+         obs_val = as.numeric(y==pred_level))
+
+ggplot(aes(x= x, y= obs_val),data=ocat_predict)+
+  facet_wrap(~pred_level)+
+  geom_point()+
+  geom_line(aes(y= prediction))+
+  theme_bw(30)
+```
