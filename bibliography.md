@@ -38,6 +38,13 @@ Here we'll list some useful papers and books on the topics covered in the course
 - Dunn, P. K., & Smyth, G. K. (1996). Randomized Quantile Residuals. Journal of Computational and Graphical Statistics, 5(3), 236–244. [http://doi.org/10.1080/10618600.1996.10477470](http://doi.org/10.1080/10618600.1996.10474708)
 
 
+## Response distributions
+
+### Tweedie
+
+- Foster, S. D., & Bravington, M. V. (2012). A Poisson–Gamma model for analysis of ecological non-negative continuous data. Environmental and Ecological Statistics, 20(4), 533–552. [http://doi.org/10.1007/s10651-012-0233-0](http://doi.org/10.1007/s10651-012-0233-0)
+- Shono, H. (2008). Application of the Tweedie distribution to zero-catch data in CPUE analysis. Fisheries Research, 93(1-2), 154–162. [http://doi.org/10.1016/j.fishres.2008.03.006](http://doi.org/10.1016/j.fishres.2008.03.006)
+
 ## Applications
 
 
