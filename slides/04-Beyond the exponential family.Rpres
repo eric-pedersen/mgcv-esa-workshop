@@ -253,10 +253,13 @@ Unordered categorical data
  
  Unordered categorical data 
 ===========================
+incremental: true
 - Model probability of a category occuring relative to an (arbitrary) reference level
 - one linear equation for each category except the reference class
 - $p(y=i|\mathbf{x}) = exp(\mu_i(\mathbf{x}))/(1+\sum_j exp(\mu_j(\mathbf{x}))$
 - $\mu_i(\mathbf{x}) = s_{1,j}(x_1) + s_{2,j}(x_2)$
+- $p(y=0|\mathbf{x})= 1/(1+\sum_j exp(\mu_j(\mathbf{x}))$
+
 
   
 Using the multinom function
@@ -267,5 +270,59 @@ Using the multinom function
   ![](images/animal_functions.png)
  
  
+ 
+Using the multinom function
+===========================
+```{r multinom1, include =T,echo=F,results= "hide", fig.width=15, fig.height=8}
+set.seed(10)
+n= 500
+dat = data.frame(tree_cover = round(runif(n,0,1),2),road_dist=round(10*runif(n),1))
+dat$f_deer = with(dat, 4*exp(-road_dist/2)*road_dist - 2*(tree_cover)^2)
+dat$f_pig = with(dat, log(exp(-road_dist)+0.1)+1)
+prob_matrix = cbind(1, exp(dat$f_deer),exp(dat$f_pig))
+dat$y = apply(prob_matrix,MARGIN = 1,function(x) sample(0:2,size = 1,prob = x))
+model_dat = dat%>% select(tree_cover, road_dist, y)
+```
+
+```{r multinom2, include =T,echo=T, fig.width=15, fig.height=8}
+head(model_dat)
+``` 
+
+***
+ ```{r multinom3, include =T,echo=T, fig.width=6, fig.height=6}
+pairs(model_dat)
+``` 
+
+ 
+Using the multinom function
+===========================
+```{r multinom4, include =T,echo=F,results= "hide", fig.width=15, fig.height=8}
+multinom_model = gam(list(y~s(tree_cover)+s(road_dist), ~s(tree_cover)+s(road_dist)),
+                     data= model_dat, family=multinom(K=2))
+plot(multinom_model,page=1,cex.axis=2,cex.lab=2)
+```
+
+
+ 
+Understanding the results
+===========================
+```{r multinom5, include =T,echo=T,results= "hide", fig.width=15, fig.height=4}
+multinom_pred_data = as.data.frame(expand.grid(road_dist =seq(0,10,length=50),
+                                               tree_cover =c(0,0.33,0.66,1)))
+multinom_pred = predict(multinom_model, multinom_pred_data,type = "response")
+colnames(multinom_pred) = c("monkey","deer","pig")
+multinom_pred_data = cbind(multinom_pred_data,multinom_pred)
+multinom_pred_data_long = multinom_pred_data %>%
+  gather(species, probability, monkey, deer,pig)%>%
+  mutate(tree_cover =paste("tree cover = ", tree_cover,sep=""))
+ggplot(aes(road_dist, probability,color=species),data=multinom_pred_data_long)+
+  geom_line()+
+  facet_grid(.~tree_cover)+
+  theme_bw(20)
+
+```
+
+
+
 
  
