@@ -14,7 +14,8 @@ Most glm families (Poisson, Gamma, Gaussian, Binomial) are *exponential families
 
 $$ f(x|\theta) \sim exp(\sum_i \eta_i(\theta)T_i(x) - A(\theta))$$
 
-- Computationally easy, can find sufficient statistics
+- Computationally easy
+- Has sufficient statistics: easier to estimate parameter variance
 - ... but it doesn't describe everything
 - `mgcv` has expanded to cover many new families
 - Lets you model a much wider range of scenarios with smooths
@@ -243,3 +244,28 @@ ggplot(aes(x= x, y= obs_val),data=ocat_predict)+
 
 Unordered categorical data 
 ===========================
+- What do you do if categorical data doesn't fall in a nice order? 
+
+Unordered categorical data 
+===========================
+- What do you do if data doesn't fall in a nice order? 
+ ![](images/animal_choice.png)
+ 
+ Unordered categorical data 
+===========================
+- Model probability of a category occuring relative to an (arbitrary) reference level
+- one linear equation for each category except the reference class
+- $p(y=i|\mathbf{x}) = exp(\mu_i(\mathbf{x}))/(1+\sum_j exp(\mu_j(\mathbf{x}))$
+- $\mu_i(\mathbf{x}) = s_{1,j}(x_1) + s_{2,j}(x_2)$
+
+  
+Using the multinom function
+===========================
+ ![](images/animal_codes.png)
+ 
+ ***
+  ![](images/animal_functions.png)
+ 
+ 
+
+ 
