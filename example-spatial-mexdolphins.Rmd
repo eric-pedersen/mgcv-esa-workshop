@@ -1,0 +1,161 @@
+---
+title: "Further analysis of pantropical spotted dolphins in the Gulf of Mexico"
+output:·
+  html_document:
+    toc: true
+    toc_float: true
+    theme: readable
+    highlight: haddock
+---
+
+# Preamble
+
+This exercise is based on the [Appendix of Miller et al 2013](http://distancesampling.org/R/vignettes/mexico-analysis.html). In this example we're ignoring all kinds of important things like detectability and availability. This should not be treated as a serious analysis of these data!
+
+From that appendix:
+
+*The analysis is based on a dataset of observations of pantropical dolphins in the Gulf of Mexico (shipped with Distance 6.0 and later). For convenience the data are bundled in an `R`-friendly format, although all of the code necessary for creating the data from the Distance project files is available [on github](http://github.com/dill/mexico-data). The OBIS-SEAMAP page for the data may be found at the [SEFSC GoMex Oceanic 1996](http://seamap.env.duke.edu/dataset/25) survey page.*
+
+
+## Doing these exercises
+
+Probably the easiest way to do these exercises is to open this document in RStudio and go through the code blocks one by one (hitting the "play" button in the editor window), filling in the code where necessary and executing the commands one-by-one. You can then compile the document once you're done to check that everything works.
+
+# Data format
+
+The data are provided in the `data/mexdolphins` folder as the file `mexdolphins.RData`. Loading this we can see what is provided:
+
+
+```{r loaddata}
+load("data/mexdolphins/mexdolphins.RData")
+ls()
+```
+
+- `mexdolphins` the `data.frame` containing the observations and covariates, used to fit the model.
+- `pred_latlong` an `sp` object that has the shapefile for the prediction grid, used for fancy graphs
+- `preddata` prediction grid without any fancy spatial stuff
+
+Looking further into the `mexdolphins` frame we see:
+
+```{r frameinspect}
+str(mexdolphins)
+```
+
+A brief explanation of each entry:
+
+- `Sample.Label` identifier for the effort "segment" (approximately square sampling area)
+- `Transect.Label` identifier for the transect that this segment belongs to
+- `longitude`, `latitude` location in lat/long of this segment
+- `x`, `y` location in projected coordinates
+- `Effort` the length of the current segment
+- `depth` the bathymetry at the segment's position
+- `count` number of dolphins observed in this segment
+- `segment.area` the area of the segment (`Effort` multiplied by the width of the segment
+- `off.set` the logarithm of the `segment.area` multiplied by a correction for detectability (see link to appendix above for more information on this)
+
+
+# Modelling
+
+Our objective here is to build a spatially explicit model of abundance of the dolphins. In some sense this is a kind of species distribution model.
+
+Our possible covariates to model abudance are location and depth. These are fairly good predictors of the abundance (SPOILER ALERT), though we could probably imporove the model further by including things like sea surface temperature and chlorophyll *a*.
+
+## A simple model to start with
+
+We can begin with the model we showed in the first lecture:
+
+```{r simplemodel}
+library(mgcv)
+dolphins_depth <- gam(count ~ s(depth) + offset(off.set),
+                      data = mexdolphins,
+                      family = quasipoisson(),
+                      method = "REML")
+```
+
+That is we fit the counts as a function of depth, using the offset to take into account effort. We use a quasi-Poisson response (i.e., modelling just the mean-variance relationship such that the variance is proportional to the mean) and use REML for smoothness selection.
+
+We can check the assumptions of this model by using `gam.check`:
+
+```{r simplemodel-check}
+gam.check(dolphins_depth)
+```
+
+As is usual for count data, these plots are a bit tricky to interpret. For example the residuals vs linear predictor plot in the top right has that nasty line through it that makes looking for pattern tricky. We can see easily that the line equates to the zero count observations:
+
+```{r zeroresids, fig.width=7, fig.height=7}
+# code from the insides of mgcv::gam.check
+resid <- residuals(dolphins_depth, type="deviance")
+linpred <- napredict(dolphins_depth$na.action, dolphins_depth$linear.predictors)
+plot(linpred, resid, main = "Resids vs. linear pred.",
+     xlab = "linear predictor", ylab = "residuals")
+
+# now add red dots corresponding to the zero counts
+points(linpred[mexdolphins$count==0],resid[mexdolphins$count==0],
+       pch=19, col="red", cex=0.5)
+```
+
+We can use randomised quantile residuals instead of deviance residuals to get around this in some cases (though not quasi-Poisson, as we don't have a proper likelihood!).
+
+Ignoring the plots for now (as we'll address them in the next section), let's look at the text output. It seems that the `k` value we set (or rather the default of 10) seems to have been adequate.
+
+We could increase the value of `k` by replacing the `s(...)` with, for example, `s(depth, k=25)` (for a possibly very wiggly function) or `s(depth, k=3)` (for a much less wiggly function). Makign `k` big will create a bigger design matrix and penalty matrix.
+
+
+**Exercise**
+
+Look at the differences in the size of the design and penalty matrices by using `dim(odel.matrix(...))` and `dim(model$smooth[[1]]$S[[1]])`, replacing `...` and `model` appropriately for models with `k=3` and `k=30`.
+
+```{r simplemodel-bigsmall}
+dolphins_depth_bigk <- gam(count ~ s(depth, k=30) + offset(off.set),
+                      data = mexdolphins,
+                      family = quasipoisson(),
+                      method = "REML")
+dim(model.matrix(dolphins_depth_bigk))
+dim(dolphins_depth_bigk$smooth[[1]]$S[[1]])
+dolphins_depth_smallk <- gam(count ~ s(depth, k=3) + offset(off.set),
+                      data = mexdolphins,
+                      family = quasipoisson(),
+                      method = "REML")
+dim(model.matrix(dolphins_depth_smallk))
+dim(dolphins_depth_smallk$smooth[[1]]$S[[1]])
+```
+
+(Don't worry about the many square brackets etc in the penalty matrix query!)
+
+### Plotting
+
+We can plot the smooth we fitted using `plot`.
+
+**Exercise**
+
+Compare the first model we fitted with the two using different `k` values above. Use `par(mfrow=c(1,3))` to put them all in one graphic. Look at `?plot.gam` and plot the confidence intervals as a filled "confidence band". Title the plots appropriately so you can check which is which.
+
+```{r plotk, }
+par(mfrow=c(1,3))
+plot(dolphins_depth, shade=TRUE, main="Default k")
+plot(dolphins_depth_bigk, shade=TRUE, main="big k")
+plot(dolphins_depth_smallk, shade=TRUE, main="small k")
+```
+
+## Count distributions
+
+In general quasi-Poisson doesn't seem to do too great a job at modelling data with many zeros. Luckily we have a few tricks up our sleeves...
+
+
+### Tweedie
+
+### Negative binomial
+
+
+### Zero-inflated Poisson
+
+
+
+
+## Smoothers
+
+### Simple spatial models
+
+### Thin plate splines with shrinkage
+
+### Soap film smoother
