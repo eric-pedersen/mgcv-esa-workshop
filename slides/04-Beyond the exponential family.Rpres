@@ -39,19 +39,102 @@ opts_chunk$set(cache=TRUE, echo=FALSE,fig.align="center")
 
 What we'll cover
 ===================================
-- Over-dispersed data: Negative binomial and Tweedie distributions
-- Modelling exta zeros with zero-inflated and adjusted families
+
+- "Counts": Negative binomial and Tweedie distributions
 - Modelling proportions with the Beta distribution
 - Robust regression with the Student's t distribution
 - Ordered and unorderd categorical data
 - Multivariate normal data
+- Modelling exta zeros with zero-inflated and adjusted families
 
 - _NOTE_: All the distributions we're covering here have their own quirks. Read 
 the help files carefully before using them!
 
-Modelling Zeros
+Modelling "counts"
 ================
 type:section
+
+Counts and count-like things
+============================
+
+- Response is a count (not not always integer)
+- Often, it's mostly zero (that's complicated)
+- Could also be catch per unit effort, biomass etc
+- Flexible mean-variance relationship
+
+![The Count from Sesame Street](images/count.jpg)
+
+Tweedie distribution
+=====================
+
+```{r tweedie}
+library(tweedie)
+library(RColorBrewer)
+
+# tweedie
+y<-seq(0.01,5,by=0.01)
+pows <- seq(1.2, 1.9, by=0.1)
+
+fymat <- matrix(NA, length(y), length(pows))
+
+i <- 1
+for(pow in pows){
+  fymat[,i] <- dtweedie( y=y, power=pow, mu=2, phi=1)
+  i <- i+1
+}
+
+plot(range(y), range(fymat), type="n", ylab="Density", xlab="x", cex.lab=1.5,
+     main="")
+
+rr <- brewer.pal(8,"Dark2")
+
+for(i in 1:ncol(fymat)){
+  lines(y, fymat[,i], type="l", col=rr[i], lwd=2)
+}
+```
+***
+-  $\text{Var}\left(\text{count}\right) = \phi\mathbb{E}(\text{count})^q$
+- Common distributions are sub-cases:
+  - $q=1 \Rightarrow$ Poisson
+  - $q=2 \Rightarrow$ Gamma
+  - $q=3 \Rightarrow$ Normal
+- We are interested in $1 < q < 2$ 
+- (here $q = 1.2, 1.3, \ldots, 1.9$)
+- `tw()`
+
+
+Negative binomial
+==================
+
+```{r negbin}
+y<-seq(1,12,by=1)
+disps <- seq(0.001, 1, len=10)
+
+fymat <- matrix(NA, length(y), length(disps))
+
+i <- 1
+for(disp in disps){
+  fymat[,i] <- dnbinom(y, size=disp, mu=5)
+  i <- i+1
+}
+
+plot(range(y), range(fymat), type="n", ylab="Density", xlab="x", cex.lab=1.5,
+     main="")
+
+rr <- brewer.pal(8,"Dark2")
+
+for(i in 1:ncol(fymat)){
+  lines(y, fymat[,i], type="l", col=rr[i], lwd=2)
+}
+```
+***
+- $\text{Var}\left(\text{count}\right) =$ $\mathbb{E}(\text{count}) + \kappa \mathbb{E}(\text{count})^2$
+- Estimate $\kappa$
+- Is quadratic relationship a "strong" assumption?
+- Similar to Poisson: $\text{Var}\left(\text{count}\right) =\mathbb{E}(\text{count})$ 
+- `nb()`
+
+
 
 
 Modelling proportions
