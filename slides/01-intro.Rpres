@@ -450,8 +450,6 @@ grid_plot_obj <- function(fill, name, sp){
 ```{r spatialEDA, fig.cap="", fig.width=15}
 
 # some nearby states, transformed
-#map_dat <- map_data("state",c("mississippi","florida", "louisiana", "georgia",
-#                              "alabama", "texas"))
 library(mapdata)
 map_dat <- map_data("worldHires",c("usa","mexico"))
 lcc_proj4 <- CRS("+proj=lcc +lat_1=20 +lat_2=60 +lat_0=40 +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs ")
