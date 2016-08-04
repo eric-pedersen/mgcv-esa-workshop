@@ -46,6 +46,8 @@ What we'll cover
 - Ordered and unorderd categorical data
 - Multivariate normal data
 
+- _NOTE_: All the distributions we're covering here have their own quirks. Read 
+the help files carefully before using them!
 
 Modelling Zeros
 ================
@@ -248,7 +250,7 @@ Unordered categorical data
 
 Unordered categorical data 
 ===========================
-- What do you do if data doesn't fall in a nice order? 
+- What do you do if categorical data doesn't fall in a nice order? 
  ![](images/animal_choice.png)
  
  Unordered categorical data 
@@ -323,6 +325,62 @@ ggplot(aes(road_dist, probability,color=species),data=multinom_pred_data_long)+
 ```
 
 
+Other multivariate distributions to check out
+===================================
+type: section
+
+
+Multivariate normal (family = mvn)
+===========================
+incremental: true
+
+- Fit a different smooth model for multiple y-variables, but allowing 
+  correlation between y's
+- Example uses: multi-species distribution models, measuring latent correlations
+  between environmental predictors
+- mgcv code: formula=list(y1~s(x1)+s(x2), y2 = s(x1)+s(x3)), family = mvn(d=2)
+
+Cox Proportional hazards (family = cox.ph)
+===========================
+incremental: true
+
+- Censored data: y measures time until an event occurs, or the study was stopped (censoring)
+- Measures relative rates, rather than absolute rates (no intercepts)
+- Example uses: time until an individual is infected, time until a subpopulation goes 
+  extinct, time until lake is invaded
+- mgcv code: `formula = y~s(x1)+s(x2), weights= censor.var,family=cox.ph` 
+- censor.var = 0 if censored, 1 if not
+
+
+Gaussian location-scale models (family = gaulss)
+===========================
+incremental: true
+
+- Model both the mean ("location") and variance ("scale") as smooth functions of predictors 
+- Example uses: detecting early warning signs in time series, finding factors driving 
+population variability
+- mgcv code: `formula = list(y~s(x1)+s(x2), ~s(x2)+s(x3)), family=gaulss`
+- censor.var = 0 if censored, 1 if not
+
+
+
+Zero-inflated Poisson location-scale models (family = ziplss)
+===========================
+incremental: true
+
+- Models the probability of zeros seperately from mean counts given that you've observed more than zero
+at a location.
+- Example uses: Counts of prey caught when a predator might switch between not hunting at all (zeros)
+and active hunting
+- mgcv code: `formula = list(y~s(x1)+s(x2), ~s(x2)+s(x3)), family=ziplss` 
+
+
+The end of the distribution zoo
+==============
+type:section 
+
+That's the end of this section! We convene after lunch (1:00 PM). You'll 
+get to work through a few more advanced examples of your choice. 
 
 
  
