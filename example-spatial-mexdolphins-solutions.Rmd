@@ -107,7 +107,18 @@ We could increase the value of `k` by replacing the `s(...)` with, for example, 
 Look at the differences in the size of the design and penalty matrices by using `dim(odel.matrix(...))` and `dim(model$smooth[[1]]$S[[1]])`, replacing `...` and `model` appropriately for models with `k=3` and `k=30`.
 
 ```{r simplemodel-bigsmall}
-
+dolphins_depth_bigk <- gam(count ~ s(depth, k=30) + offset(off.set),
+                      data = mexdolphins,
+                      family = quasipoisson(),
+                      method = "REML")
+dim(model.matrix(dolphins_depth_bigk))
+dim(dolphins_depth_bigk$smooth[[1]]$S[[1]])
+dolphins_depth_smallk <- gam(count ~ s(depth, k=3) + offset(off.set),
+                      data = mexdolphins,
+                      family = quasipoisson(),
+                      method = "REML")
+dim(model.matrix(dolphins_depth_smallk))
+dim(dolphins_depth_smallk$smooth[[1]]$S[[1]])
 ```
 
 (Don't worry about the many square brackets etc to get the penalty matrix!)
@@ -122,7 +133,9 @@ Compare the first model we fitted with the two using different `k` values above.
 
 ```{r plotk, }
 par(mfrow=c(1,3))
-
+plot(dolphins_depth, shade=TRUE, main="Default k")
+plot(dolphins_depth_bigk, shade=TRUE, main="big k")
+plot(dolphins_depth_smallk, shade=TRUE, main="small k")
 ```
 
 ## Count distributions
@@ -152,7 +165,10 @@ More information on Tweedie distributions can be found in Foster & Bravington (2
 Now do the same using the negative binomial distribution (`nb()`).
 
 ```{r nb}
-
+dolphins_xy_nb <- gam(count ~ s(x,y) + s(depth) + offset(off.set),
+                         data = mexdolphins,
+                         family = nb(),
+                         method = "REML")
 ```
 
 Looking at the quantile-quantile plots only in the `gam.check` output for these two models, which do you prefer? Why?
@@ -175,11 +191,20 @@ By default we use the `"tp"` basis. This is just plain thin plate regression spl
 Compare the results from one of the models above with a version using the thin plate with shrinkage using the `bs="ts"` argument to `s()` for both terms.
 
 ```{r tw-ts}
+dolphins_xy_tw_ts <- gam(count ~ s(x,y, bs="ts") + s(depth, bs="ts") +
+                                 offset(off.set),
+                         data = mexdolphins,
+                         family = tw(),
+                         method = "REML")
 ```
 
 What are the differences (use `summary`)?
 
+*EDFs are different for both terms*
+
 What are the visual differences (use `plot`)?
+
+*Not really much difference here!*
 
 
 ### Soap film smoother
@@ -226,12 +251,14 @@ dolphins_soap <- gam(count ~ s(x,y, bs="so", xt=list(bnd=list(xy_bnd))) +
 Look at the `summary` output for this model and compare it to the other models.
 
 ```{r soap-summary}
+summary(dolphins_soap)
 ```
 
 The plotting function for soap film smooths looks much nicer by default than for other 2D smooths -- try it out.
 
 
 ```{r soap-plot}
+plot(dolphins_soap)
 ```
 
 # Predictions
@@ -249,6 +276,11 @@ Now, this just gives a long vector of numbers for the predicted number of animal
 **Exercise**
 
 How many dolphins are there in the total area? What is the maximum in a given cell? What is the minimum?
+
+```{r total-max-min}
+sum(pred_qp)
+range(pred_qp)
+```
 
 ## Plotting predictions
 
@@ -387,7 +419,24 @@ We can use the `se.fit=TRUE` argument to get the per-cell standard errors, then 
 Note that the resulting object from setting `se.fit=TRUE` is a list with two elements.
 
 ```{r CVmap}
+pred_se_qp <- predict(dolphins_depth, preddata, type="response", se.fit=TRUE)
+cv <- pred_se_qp$se.fit/pred_se_qp$fit
 
+p <- ggplot() +
+      # abundance
+      grid_plot_obj(cv, "CV", pred.polys) +
+      # survey lines
+      geom_line(aes(x, y, group=Transect.Label), data=mexdolphins) +
+      # make the coordinate system fixed
+      coord_fixed(ratio=1, ylim = range(mexdolphins$y),
+                  xlim = range(mexdolphins$x)) +
+      # use the viridis colourscheme, which is more colourblind-friendly
+      scale_fill_viridis() +
+      # labels
+      labs(fill="CV",x="x",y="y",size="Count") +
+      # keep things simple
+      theme_minimal()
+print(p)
 ```
 
 Compare the uncertainties of the different models you've fitted so far.
