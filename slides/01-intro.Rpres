@@ -133,23 +133,23 @@ $$
 y_i = \beta_0 + \sum_j s_j(x_{ji}) + \epsilon_i
 $$
 
-where $\epsilon_i \sim N(0, \sigma^2)$
-
-Let's pretend that $y_i \sim \text{Normal}$
+where $\epsilon_i \sim N(0, \sigma^2)$, $y_i \sim \text{Normal}$ (for now)
 
 Remember that we're modelling the mean of this distribution!
 
+Call the above equation the **linear predictor**
+
 Okay, but what about these "s" things?
 ====================================
-right:45%
+right:55%
 
-```{r smoothdat, fig.width=9, fig.height=6}
+```{r smoothdat, fig.width=8, fig.height=8}
 
 spdat <- melt(dat, id.vars = c("y"))
 p <- ggplot(spdat,aes(y=y,x=value)) +
       geom_point() +
       theme_minimal() +
-      facet_wrap(~variable, nrow=1)
+      facet_wrap(~variable, nrow=2)
 print(p)
 ```
 ***
@@ -160,10 +160,11 @@ print(p)
 
 Okay, but what about these "s" things?
 ====================================
-right:45%
+right:55%
 
-```{r wsmooths, fig.width=9, fig.height=6}
-print(p + geom_smooth())
+```{r wsmooths, fig.width=8, fig.height=8}
+p <- p + geom_smooth()
+print(p)
 ```
 ***
 - Think $s$=**smooth**
@@ -178,8 +179,9 @@ type:section
 
 Straight lines vs. interpolation
 =================================
+right:55%
 
-```{r wiggles}
+```{r wiggles, fig.height=8, fig.width=8}
 library(mgcv)
 # hacked from the example in ?gam
 set.seed(2) ## simulate some data... 
@@ -216,11 +218,12 @@ Design matrices
 ===============
 
 - We often write models as $X\boldsymbol{\beta}$
-- $X$ is our data
-- $\boldsymbol{\beta}$ are parameters we need to estimate
+  - $X$ is our data
+  - $\boldsymbol{\beta}$ are parameters we need to estimate
 - For a GAM it's the same
-- $X$ has columns for each basis, evaluated at each observation
-
+  - $X$ has columns for each basis, evaluated at each observation
+  - again, this is the linear predictor
+  
 Measuring wigglyness
 ======================
 
@@ -353,8 +356,7 @@ type:section
 GAM summary
 ===========
 
-- Straight lines suck
-- Want wiggles
+- Straight lines suck --- we want **wiggles**
 - Use little functions (**basis functions**) to make big functions (**smooths**)
 - Need to make sure your smooths are **wiggly enough**
 - Use a **penalty** to trade off wiggliness/generality 
@@ -377,7 +379,7 @@ where $\epsilon_i \sim N(0, \sigma^2)$
 
 Let's pretend that $y_i \sim \text{Normal}$
 
-- inside the link: `formula = y ~ s(x) + s(w)`
+- linear predictor: `formula = y ~ s(x) + s(w)`
 - response distribution: `family=gaussian()`
 - data: `data=some_data_frame` 
 
@@ -532,6 +534,15 @@ Bivariate terms
 - We can specify `s(x,y)` (and `s(x,y,z,...)`)
 - (Assuming *isotropy* here...)
 
+```{r xydsmplot, fig.width=15, fig.height=7}
+dolphins_depth_xy <- gam(count ~ s(x, y) + offset(off.set),
+                 data = mexdolphins,
+                 family=quasipoisson(), method="REML")
+par(mfrow=c(1,3))
+vis.gam(dolphins_depth_xy, view=c("x","y"), phi=45, theta=20, asp=1)
+vis.gam(dolphins_depth_xy, view=c("x","y"), phi=45, theta=60, asp=1)
+vis.gam(dolphins_depth_xy, view=c("x","y"), phi=45, theta=160, asp=1)
+```
 
 Adding a term
 ===============
@@ -542,7 +553,7 @@ Adding a term
 ```{r xydsm, echo=TRUE}
 dolphins_depth_xy <- gam(count ~ s(depth) + s(x, y) + offset(off.set),
                  data = mexdolphins,
-                 family=tw(), method="REML")
+                 family=quasipoisson(), method="REML")
 ```
 
 
@@ -639,7 +650,8 @@ Where are the dolphins?
 =======================
 
 ```{r echo=TRUE}
-dolphin_preds <- predict(dolphins_depth_xy, newdata=preddata, type="response")
+dolphin_preds <- predict(dolphins_depth_xy, newdata=preddata,
+                         type="response")
 ```
 
 ```{r fig.width=20}
@@ -681,8 +693,8 @@ Where does uncertainty come from?
 - $\boldsymbol{\beta}$: uncertainty in the spline parameters
 - $\boldsymbol{\lambda}$: uncertainty in the smoothing parameter
 
-- Traditionally we've only addressed the former
-- New tools let us address the latter...
+- (Traditionally we've only addressed the former)
+- (New tools let us address the latter...)
 
 
 Parameter uncertainty
@@ -827,4 +839,8 @@ Summary
   - Basis + penalty is the way to do this
 - Fitting looks like `glm` with extra `s()` terms
 - Most stuff comes down to matrix algebra, that `mgcv` sheilds you from
-- To do fancy stuff, get inside the matrices
+  - To do fancy stuff, get inside the matrices
+
+COFFEE
+======
+type:section
