@@ -57,7 +57,7 @@ type:section
 Counts and count-like things
 ============================
 
-- Response is a count (not not always integer)
+- Response is a count (not always integer)
 - Often, it's mostly zero (that's complicated)
 - Could also be catch per unit effort, biomass etc
 - Flexible mean-variance relationship
