@@ -12,6 +12,53 @@ output:
 
 In this example, we look at a spatial data set of forest health data from a stand in Germany. We can treat the individual trees as discrete spatial units and fit a spatial term using a special type of spline basis, a Markov random field.
 
+The data come from a project n the forest of Rothenbuch, Germany, which has been ongoing since 1982. The project studies five species but here we just consider the beech data. Each year the condition of each of 83 trees is categorized into one of nine ordinal classes in terms of the degree (percentage) of defoliation. A defoliation value of 0% indicates a healthy beech tree, whilst a value of 100% indicates a tree is dead. For the purposes of this example, several of the nine ordinal classes are merged to form a three class response variable of interest
+
+1. 0%, healthy trees that I'll refer to as the `"low"` defoliation group
+2. 12.5% -- 37.5% defoliation, which I refer to as the `"med"` group, and
+3. 50% -- 100% defoliation, which is the `"high"` group.
+
+The original classes were `r paste0(c(0,12.5,37.5,50,62.5,75, 87.5, 100), "%")` and are in variable `defol`.
+
+Alongside the response variable, a number of continuous and categorical covariates are recorded
+
+- `id` --- location ID number
+- `year` --- year of recording
+- `x` and `y` --- the x- and y-coordinates of each location
+- `age` --- average age of trees at a location
+- `canopyd` --- canopy density at the location, in %
+- `gradient` --- slope, in %
+- `alt` --- altitude above sea level in m
+- `depth` --- soil depth in cm
+- `ph` --- soil pH at 0--2cm depth
+- `watermoisture` --- soil moisture in three categories
+    1. `1` moderately dry
+    2. `2` moderately moist
+    3. `3` moist or temporarily wet
+- `alkali` --- fraction of alkali ions in four categories
+    1. `1` very low
+    2. `2` low
+    3. `3` moderate
+	4. `4` high
+- `humus` thickness of the soil humus layer in five categories
+    1. `0` 0cm
+    2. `1` 1cm
+    3. `2` 2cm
+	4. `3` 3cm
+	5. `4` $>$3cm
+- `type` --- type of forest
+    - `0` deciduous forest
+    - `1` mixed forest
+- `fert` --- fertilization
+    - `0` not fertilized
+    - `1` fertilized
+
+The aim of the example is to investigate the effect of the measured covariates on the degree of defoliation and to quantify any temporal trend and spatial effect of geographic location in the data set, while adjusting for the effects of the other covariates.
+
+The data are extensively analysed in Fahrmeir, Kneib, Lang, and Marx (2013) *Regression: Models, Methods and Applications*. Springer.
+
+# Getting started
+
 Begin by loading the packages we'll use in this example
 
 ```{r load-packages}
@@ -31,7 +78,7 @@ head(forest)
 The data require a little processing to ensure they are correctly coded. The chunk below does
 
 1. Makes a nicer stand label so that we can sort stands numerically even though the id is character,
-2. Aggregates the defolition data into an ordered categorical variable for low, medium, or high levels of defoilation. This is converted to a numeric variable for modelling,
+2. Aggregates the defoliation data into an ordered categorical variable for low, medium, or high levels of defoliation. This is converted to a numeric variable for modelling,
 3. Convert the categorical variables to factors. `humus` is converted to a 4-level factor,
 4. Remove some `NA`s, and
 5. Summarises the response variable in a table.
@@ -55,13 +102,15 @@ head(forest)
 with(forest, table(aggDefol))
 ```
 
-To view the spatial arrangement of the forest stand, plot the unique `x` and `y` coordinate paris
+To view the spatial arrangement of the forest stand, plot the unique `x` and `y` coordinate pairs
 
 ```{r plot-forest-stand}
 ## Plot data
 ggplot(unique(forest[, c("x","y")]), aes(x = x, y = y)) +
     geom_point()
 ```
+
+# Non-spatial ordered categorical GAM
 
 Our first model will ignore the spatial component of the data. All continuous variables except `ph` and `depth` are modelled using splines, and all categorical variables are included in the model. Note that we can speed up fitting by turning on some multi-threaded parallel processing in parts of the fitting algorithm via the `nthreads` control argument. The `ocat` family is used and we specify that there are three classes. Smoothness selection is via REML.
 
@@ -80,14 +129,14 @@ The model summary
 summary(forest.m1)
 ```
 
-indicates all model terms are significant at the 95% level, especially the smooth terms. Don't pay too much attention to this though as we have not yet acocunted for spatial structure in the data and several of the variables are likely to be spatially autocorrelated and hence the identified effects may be spurious.
+indicates all model terms are significant at the 95% level, especially the smooth terms. Don't pay too much attention to this though as we have not yet accounted for spatial structure in the data and several of the variables are likely to be spatially autocorrelated and hence the identified effects may be spurious.
 
 This  is somewhat confirmed by the form of the fitted functions; rather than smooth, monotonic functions man terms are highly non-linear and difficult to interpret.
 
 ```{r plot-naive-smooths}
 plot(forest.m1, pages = 1, shade = 2, scale = 0)
 ```
-We might expect that older trees are more susceptible to damage yet confusingly there is a decreasing effect for the very oldest trees. The smooth of `gradient` is uninterprettable. Trees in low and high altitude areas are less damaged than those in areas of intermediate elevation, which is also counterintuitive.
+We might expect that older trees are more susceptible to damage yet confusingly there is a decreasing effect for the very oldest trees. The smooth of `gradient` is uninterpretable. Trees in low and high altitude areas are less damaged than those in areas of intermediate elevation, which is also counter intuitive.
 
 Running gam.check()`
 
@@ -97,9 +146,9 @@ gam.check(forest.m1)
 
 suggests no major problems, but the residual plot is difficult to interpret owing to the categorical nature of the response variable. The printed output suggests some smooth terms may need their basis dimension increasing. Before we do this however, we should add a spatial effect to the model.
 
-## Model with an MRF
+# Spatial GAM via a MRF smooth
 
-For these data, it would be more natural to fit a spatial effect via a 2-d smoother as we've considered in other examples. However, we can consider the trees as being discrete spatial units and fit a spatial effect via a Markov random field (MRF) smooth. To fit the MRF smoother, we need information on the neighbours of each tree. In this example, any tree within 1.8km of a focal tree was considered a neighrbour of that focal tree. This neighbourhood information is stored in a BayesX graph file, which we can convert into the format needed for **mgcv**'s MRF basis function. To facilitate reading the graph file, load the utility function `gra2mgcv()`
+For these data, it would be more natural to fit a spatial effect via a 2-d smoother as we've considered in other examples. However, we can consider the trees as being discrete spatial units and fit a spatial effect via a Markov random field (MRF) smooth. To fit the MRF smoother, we need information on the neighbours of each tree. In this example, any tree within 1.8km of a focal tree was considered a neighbour of that focal tree. This neighbourhood information is stored in a BayesX graph file, which we can convert into the format needed for **mgcv**'s MRF basis function. To facilitate reading the graph file, load the utility function `gra2mgcv()`
 
 ```{r load-graph-fun}
 ## souce graph reading function
@@ -123,7 +172,7 @@ head(nb)
 
 In **mgcv** the MRF basis can be specified by one or more of
 
-1. `polys`; coordinates of vertices defining spatial polygons for each discrete spaital unit. Any two spatial units that share one or more vertices are considered neighbours,
+1. `polys`; coordinates of vertices defining spatial polygons for each discrete spatial unit. Any two spatial units that share one or more vertices are considered neighbours,
 2. `nb`; a list with one component per spatial unit, where each component contains indices of the neighbouring components of the current spatial unit, and/or
 3. `penalty`; the actual penalty matrix of the MRF basis. This is an $N$ by $N$ matrix with the number of neighbours of each unit on the diagonal, and the $j$th column of the $i$th row set to `-1` if the $j$th spatial unit is a neighbour of the $i$th unit. Elsewhere the penalty matrix is all `0`s.
 
@@ -149,9 +198,9 @@ Look at the model summary:
 summary(forest.m2)
 ```
 
-What differences do you see beween the model with the MRF spatial effect and te first model that we fitted?
+What differences do you see between the model with the MRF spatial effect and the first model that we fitted?
 
-Quickly create plots of the fitte dsmooth functions
+Quickly create plots of the fitted smooth functions
 
 ```{r plot-mrf-smooths}
 plot(forest.m2, pages = 1, shade = 2, scale = 0, seWithMean = TRUE)
@@ -161,7 +210,7 @@ Notice that here we use `seWithMean = TRUE` as one of the terms has been shrunk 
 
 Compare these fitted functions with those from the original model. Are these more in keeping with expectations?
 
-Model diagnostics are difficult with models fordiscrete responses such as these. Instead we can interrogate the model to derive quantities of interest that illustrate or summaris the model fit. First we start by generating posterior probabilities for the three ordinal defoliation/damage categories using `predict()`. This is similar to the code Eric showed this morning for the ordered categorical family.
+Model diagnostics are difficult with models for discrete responses such as these. Instead we can interrogate the model to derive quantities of interest that illustrate or summarise the model fit. First we start by generating posterior probabilities for the three ordinal defoliation/damage categories using `predict()`. This is similar to the code Eric showed this morning for the ordered categorical family.
 
 ```{r fitted-values}
 fit <- predict(forest.m2, type = "response")
@@ -169,7 +218,7 @@ colnames(fit) <- levs
 head(fit)
 ```
 
-The `predict()` method returns a 3-column matrix, one column per category. The entries in the matrix are the posterior probilities of class membership, with rows summing to 1. As we'll see later, we can take a *majority wins* approach and assign each observation a fitted class membership and compare these to the known classes.
+The `predict()` method returns a 3-column matrix, one column per category. The entries in the matrix are the posterior probabilities of class membership, with rows summing to 1. As we'll see later, we can take a *majority wins* approach and assign each observation a fitted class membership and compare these to the known classes.
 
 For easier visualisation it would be nicer to have these fitted probabilities in a tidy form, which we now do via a few manipulations
 
@@ -234,7 +283,7 @@ sum(fitClass == obsClass) / length(fitClass)
 table(fitClass, obsClass)
 ```
 
-Just don't take it as any indication of how well the model will do at predicting the defolition class for a new year or tree.
+Just don't take it as any indication of how well the model will do at predicting the defoliation class for a new year or tree.
 
 How better does the model with the MRF spatial effect fit the data compared to the original model that was fitted? We can use AIC as one means of answering that question
 
@@ -246,4 +295,4 @@ Which model does AIC indicate as fitting the data best?
 
 ## Exercise
 
-As an additional exercise, replace the MRF smooth with a 2-d spline of the `x` and `y` coordinates and preduce maps of the class probabilities over the spatial domain. You'll need to use ideas and techniques from some of the other spatial examples in order to complete this task.
+As an additional exercise, replace the MRF smooth with a 2-d spline of the `x` and `y` coordinates and produce maps of the class probabilities over the spatial domain. You'll need to use ideas and techniques from some of the other spatial examples in order to complete this task.
