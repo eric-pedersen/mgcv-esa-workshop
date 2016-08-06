@@ -144,7 +144,32 @@ type:section
 The Beta distribution
 ======================
 
+```{r beta-dist}
+shape1 <- c(0.2, 1, 5, 1, 3, 1.5)
+shape2 <- c(0.2, 3, 1, 1, 1.5, 3)
+x <- seq(0.01, 0.99, length = 200)
+rr <- brewer.pal(length(shape1), "Dark2")
+fymat <- mapply(dbeta, shape1, shape2, MoreArgs = list(x = x))
+matplot(x, fymat, type = "l", col = rr, lwd = 2, lty = "solid")
+legend("top", bty = "n",
+       legend = expression(alpha == 0.2 ~~ beta == 0.2,
+                           alpha == 1.0 ~~ beta == 3.0,
+                           alpha == 5.0 ~~ beta == 1.0,
+                           alpha == 1.0 ~~ beta == 1.0,
+                           alpha == 3.0 ~~ beta == 1.5,
+                           alpha == 1.5 ~~ beta == 3.0),
+       col = rr, cex = 1.25, lty = "solid", lwd = 2)
+```
 
+***
+
+- Proportions are continuous, bounded at 0 & 1
+- Beta distribution is convenient distribution
+- Two strictly positive shape parameters, $\alpha$ & $\beta$
+- Has support on $x \in (0,1)$
+- Density at $x = 0$ & $x = 1$ is $\infty$, fudge
+- **betareg** package
+- `betar()` family in **mgcv**
 
 Modelling outliers
 ====================
