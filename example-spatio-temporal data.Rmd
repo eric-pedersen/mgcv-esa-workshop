@@ -398,10 +398,14 @@ suggested. Still, the large-scale trends remain the same from before.
 
 1. Given that most of the variability appears to be latitudinal, try to adapt 
 the tensor smoothers so that latitude,longitude, and year all have their own 
-penalty terms. How does this change model fit? 2. Following up on the prior
+penalty terms. How does this change model fit? 
+
+2. Following up on the prior
 exorcise: build a model that allows you to explicitly calculate the marginal
 latitudinal gradient in diversity, and to determine how the latitudinal gradient
-has changed over time. 3. We know from basic sampling theory that if you sample
+has changed over time. 
+
+3. We know from basic sampling theory that if you sample
 fewer individuals over time, you also expect to find lower richness, even if
 actual richness stays unchanged. What does the spatiotemporal pattern of
 abudance look like? Does adding bird abudance as a predictor explain any of the
