@@ -1,0 +1,100 @@
+---
+title: "More time series; bivariate smooths and ti()"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    theme: readable
+    highlight: haddock
+    fig_width: 10
+    fig_height: 4
+---
+
+## Background 
+
+This example is an extension of the Fort Lauderdale time series model. Here we look at two additional advanced features, namely
+
+i. allowing the seasonal and trend terms to interact, and
+ii. setting up an ANOVA-like decomposition for interaction smooth using `ti()` terms
+
+The model in the earlier example estimated a constant non-linear seasonal (within-year) effect and a constant non-linear trend (between year) effect. Such a model is unable to capture any potential change in the seasonal effect (the within-year distribution of temperatures) over time. Or, put another way, is unable to capture potentially different trends in temperature are particular times of the year.
+
+This example extends the simpler model to more generally model changes in temperature.
+
+### Loading and viewing the data
+
+The time series we'll look at is a long-term temperature and precipitation
+data set from the convention center here at Fort Lauderdale, consisting of 
+monthly mean temperature (in degrees c), the number of days it rained that
+month, and the amount of precipitation that month (in mm). The data range from
+1950 to 2015, with a column for year and month (with Jan. = 1). The data is from
+a great web-app called FetchClim2, and the link for the data [I used is
+here](http://fetchclimate2.cloudapp.net/#page=geography&dm=values&t=years&v=airt(13,6,2,1),prate(12,7,2,1),wet(1)&y=1950:1:2015&dc=1,32,60,91,121,152,182,213,244,274,305,335,366&hc=0,24&p=26.099,-80.123,Point%201&ts=2016-07-17T21:57:11.213Z).
+
+Here we'll load it and plot the air temperature data.
+
+```{r, echo = TRUE, tidy = FALSE, include = TRUE, message = FALSE, highlight = TRUE}
+library("mgcv")
+library("ggplot2")
+florida <- read.csv("./data/time_series/Florida_climate.csv",
+                    stringsAsFactors = FALSE)
+head(florida)
+
+ggplot(data = florida, aes(x = month, y = air_temp, color = year, group = year)) +
+  geom_point() +
+  geom_line()
+```
+
+## Fitting the smooth interaction model
+
+Following from the earlier example, we fit a smooth interaction model using a tensor product spline of `year` and `month`. Notice how we specify the marginal basis types as a character vector. Here I restrict the model to AR(1) errors as this was the best model in the earlier example and it is unlikely that additional unmodelled temporal structure will turn up when we use a more general model!
+
+```{r fit-smooth-interaction, echo = TRUE, tidy = FALSE, include = TRUE, message = FALSE}
+m.full <- gamm(air_temp ~ te(year, month, bs = c("tp", "cc")), data = florida,
+               correlation = corAR1(form = ~ 1 | year),
+               knots = list(month = c(0.5, 12.5)))
+layout(matrix(1:3, nrow = 1))
+plot(m.full$gam, scheme = 1, theta = 40)
+plot(m.full$gam, scheme = 1, theta = 80)
+plot(m.full$gam, scheme = 1, theta = 120)
+layout(1)
+summary(m.full$gam)
+```
+
+The plot of the tensor product smooth is quite illustrative as to what the model is attempting to do. The earlier model would be forced to retain the same seasonal curve throughout the time series. Now, with the more complex model, the seasonal curve is allowed to change shape smoothly through time.
+
+Our task now is to test whether this additional complexity is worth the extra effort? Are some months warming more than others in Fort Lauderdale?
+
+## Fitting the ANOVA-decompososed model
+
+The logical thing to do to test whether some months are warming more than others would be to drop the interaction term from the model and compare the simpler and more complex models with AIC or a likelihood ratio test. But if you look back at the model we just fitted, there is no term in that model that relates just to the interaction! The tensor product contains both the main and interactive effects. What's worse is that we can't (always) compare this model with the one we fitted in the earlier example because we need to be careful to ensure the models are properly nested. This is where the `ti()` smoother comes in.
+
+A `ti()` smoother is like a standard tensor product (`te()`) smooth, but without the main effects smooths. Now we can build a model with separate main effects smooths for `year` and `month` and add in the interaction smooth using `ti()`. This will allow us to fit two properly nested that can be compared to test our null hypothesis that the months are warming at the same rate.
+
+Let's fit those models
+
+```{r fit-anova-decomp, echo = TRUE, tidy = FALSE, include = TRUE, message = FALSE}
+m.main <- gam(air_temp ~ s(year, bs = "tp") + s(month, bs = "cc"), data = florida,
+              knots = list(month = c(0.5, 12.5)))
+m.int  <- gam(air_temp ~ ti(year, bs = "tp") + ti(month, bs = "cc") +
+                ti(year, month, bs = c("tp", "cc"), k = 11), data = florida,
+              knots = list(month = c(0.5, 12.5)))
+```
+
+If you do this with `gamm()` the model fitting will fail, and for good reason. At least the two `gam()` models converged so we can see what is going on. Compare the two models using `AIC()`
+
+```{r aic-anova-decomp, echo = TRUE, tidy = FALSE, include = TRUE, message = FALSE}
+AIC(m.main, m.int)
+```
+
+AIC tells us that there is some support for the interaction model, but only when we force a more complex surface by specifying `k`.
+
+Regardless, the interaction term only affords a >1% improvement in deviance explained; whilst the interaction may be favoured by AIC, any variation in the seasonal effect over time must be small.
+
+## Exercises
+
+1. For an example where there is a stronger change in the seasonal effect, see my two blog posts on applying these models to the Central England Temperature series:
+    - [Post 1](http://www.fromthebottomoftheheap.net/2015/11/21/climate-change-and-spline-interactions/)
+    - [Post 2](http://www.fromthebottomoftheheap.net/2015/11/23/are-some-seasons-warming-more-than-others/)
+
+    These two posts take you through a full analysis of this data series.
