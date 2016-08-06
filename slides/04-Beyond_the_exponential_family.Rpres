@@ -163,13 +163,80 @@ legend("top", bty = "n",
 
 ***
 
-- Proportions are continuous, bounded at 0 & 1
-- Beta distribution is convenient distribution
+- Proportions; continuous, bounded at 0 & 1
+- Beta distribution is convenient choice
 - Two strictly positive shape parameters, $\alpha$ & $\beta$
 - Has support on $x \in (0,1)$
 - Density at $x = 0$ & $x = 1$ is $\infty$, fudge
 - **betareg** package
 - `betar()` family in **mgcv**
+
+Beta or Binomial?
+=================
+
+The binomial model also model's proportions --- more specifically it models the number of successes in $m$ trials. If you have data of this form then model the binomial counts as this can yield predicted *counts* if required.
+
+If you have true percentage or proportion data, say estimated prpotional plant cover in a quadrat, then the beta model is appropriate.
+
+Also, if all you have is the percentages, the beta model is unlikely to be terribly bad.
+
+Stereotypic behaviour in captive cheetahs
+=========================================
+
+To illustrate the use of the `betar()` family in **mgcv** we use a behavioural data set of observations on captive cheetahs. These data are prvided and extensively analysed in Zuur et al () and originate from Quirke et al (2012).
+
+Stereotypic behaviour in captive cheetahs
+=========================================
+
+- data collected from nine zoos
+- at randomised times of day a random number of scans (videos) of captive cheetah behaviour were recorded and analysed over a period of several months
+- presence of stereotypical behaviour was recorded
+- all individuals in an enclosure were assessed; where more than 1 individual data were aggregated over individuals to achieve 1 data point per enclosure per sampling occasion
+- a number of covariates were also recorded
+- data technically a binomial counts but we'll ignore count data and model the proportion of scans showing stereotypical behaviour
+
+Cheetah: data processing
+========================
+
+```{r cheetah-load-data, echo = TRUE}
+cheetah <- read.table("../data/beta-regression/ZooData.txt", header = TRUE)
+names(cheetah)
+cheetah <- transform(cheetah, Raised = factor(Raised),
+                     Feeding = factor(Feeding),
+                     Oc = factor(Oc),
+                     Other = factor(Other),
+                     Enrichment = factor(Enrichment),
+                     Group = factor(Group),
+                     Sex = factor(Sex, labels = c("Male","Female")),
+                     Zoo = factor(Zoo))
+```
+
+Cheetah: model fitting
+======================
+
+```{r cheetah-model, echo = TRUE}
+m <- gam(Proportion ~ s(log(Size)) + s(Visitors) + s(Enclosure) +
+           s(Vehicle) + s(Age) + s(Zoo, bs = "re") + 
+           Feeding + Oc + Other + Enrichment + Group + Sex,
+         data = cheetah, family = betar(), method = "REML")
+```
+
+Cheetah: model summary
+======================
+title: false
+
+```{R cheetah-summary}
+summary(m)
+```
+
+Cheetah: model smooths
+======================
+
+```{R cheetah-plot-smooths, fig.width = 15, fig.height = 8}
+layout(matrix(1:6, ncol = 3, byrow = TRUE))
+plot(m, shade = TRUE, scale = 0, seWithMean = TRUE)
+layout(1)
+```
 
 Modelling outliers
 ====================
