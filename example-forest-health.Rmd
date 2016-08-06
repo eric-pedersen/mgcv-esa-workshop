@@ -1,0 +1,249 @@
+---
+title: "Markov random field smooths & German forest health data"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: readable
+    highlight: haddock
+---
+
+# Introduction
+
+In this example, we look at a spatial data set of forest health data from a stand in Germany. We can treat the individual trees as discrete spatial units and fit a spatial term using a special type of spline basis, a Markov random field.
+
+Begin by loading the packages we'll use in this example
+
+```{r load-packages}
+## Load packages
+library("mgcv")
+library("ggplot2")
+```
+
+Next, load the forest health data set
+
+```{r read-data}
+## Read in the forest health data
+forest <- read.table("./data/forest-health/beech.raw", header = TRUE, na.strings = ".")
+head(forest)
+```
+
+The data require a little processing to ensure they are correctly coded. The chunk below does
+
+1. Makes a nicer stand label so that we can sort stands numerically even though the id is character,
+2. Aggregates the defolition data into an ordered categorical variable for low, medium, or high levels of defoilation. This is converted to a numeric variable for modelling,
+3. Convert the categorical variables to factors. `humus` is converted to a 4-level factor,
+4. Remove some `NA`s, and
+5. Summarises the response variable in a table.
+
+```{r process-forest-data}
+forest <- transform(forest, id = factor(formatC(id, width = 2, flag = "0")))
+
+## Aggregate defoliation & convert categorical vars to factors
+levs <- c("low","med","high")
+forest <- transform(forest,
+                    aggDefol = as.numeric(cut(defol, breaks = c(-1,10,45,101),
+                                              labels = levs)),
+                    watermoisture = factor(watermoisture),
+                    alkali = factor(alkali),
+                    humus = cut(humus, breaks = c(-0.5, 0.5, 1.5, 2.5, 3.5),
+                                labels = 1:4),
+                    type = factor(type),
+                    fert = factor(fert))
+forest <- droplevels(na.omit(forest))
+head(forest)
+with(forest, table(aggDefol))
+```
+
+To view the spatial arrangement of the forest stand, plot the unique `x` and `y` coordinate paris
+
+```{r plot-forest-stand}
+## Plot data
+ggplot(unique(forest[, c("x","y")]), aes(x = x, y = y)) +
+    geom_point()
+```
+
+Our first model will ignore the spatial component of the data. All continuous variables except `ph` and `depth` are modelled using splines, and all categorical variables are included in the model. Note that we can speed up fitting by turning on some multi-threaded parallel processing in parts of the fitting algorithm via the `nthreads` control argument. The `ocat` family is used and we specify that there are three classes. Smoothness selection is via REML.
+
+```{r fit-naive-model}
+## Model
+ctrl <- gam.control(nthreads = 3)
+forest.m1 <- gam(aggDefol ~ ph + depth + watermoisture + alkali + humus + type + fert +
+                    s(age) + s(gradient, k = 20) + s(canopyd) + s(year) + s(alt),
+                data = forest, family = ocat(R = 3), method = "REML",
+                control = ctrl)
+```
+
+The model summary
+
+```{r summary-naive}
+summary(forest.m1)
+```
+
+indicates all model terms are significant at the 95% level, especially the smooth terms. Don't pay too much attention to this though as we have not yet acocunted for spatial structure in the data and several of the variables are likely to be spatially autocorrelated and hence the identified effects may be spurious.
+
+This  is somewhat confirmed by the form of the fitted functions; rather than smooth, monotonic functions man terms are highly non-linear and difficult to interpret.
+
+```{r plot-naive-smooths}
+plot(forest.m1, pages = 1, shade = 2, scale = 0)
+```
+We might expect that older trees are more susceptible to damage yet confusingly there is a decreasing effect for the very oldest trees. The smooth of `gradient` is uninterprettable. Trees in low and high altitude areas are less damaged than those in areas of intermediate elevation, which is also counterintuitive.
+
+Running gam.check()`
+
+```{r gam-check-naive}
+gam.check(forest.m1)
+```
+
+suggests no major problems, but the residual plot is difficult to interpret owing to the categorical nature of the response variable. The printed output suggests some smooth terms may need their basis dimension increasing. Before we do this however, we should add a spatial effect to the model.
+
+## Model with an MRF
+
+For these data, it would be more natural to fit a spatial effect via a 2-d smoother as we've considered in other examples. However, we can consider the trees as being discrete spatial units and fit a spatial effect via a Markov random field (MRF) smooth. To fit the MRF smoother, we need information on the neighbours of each tree. In this example, any tree within 1.8km of a focal tree was considered a neighrbour of that focal tree. This neighbourhood information is stored in a BayesX graph file, which we can convert into the format needed for **mgcv**'s MRF basis function. To facilitate reading the graph file, load the utility function `gra2mgcv()`
+
+```{r load-graph-fun}
+## souce graph reading function
+source("./code_snippets/gra2mgcv.R")
+```
+
+Next we load the `.gra` file and do some manipulations to match the `forest` environmental data file
+
+```{r load-graph}
+## Read in graph file and output list required by mgcv
+nb <- gra2mgcv("./data/forest-health/foresthealth.gra")
+nb <- nb[order(as.numeric(names(nb)))]
+names(nb) <- formatC(as.numeric(names(nb)), width = 2, flag = "0")
+```
+
+Look at the structure of `nb`:
+
+```{r head-nb}
+head(nb)
+```
+
+In **mgcv** the MRF basis can be specified by one or more of
+
+1. `polys`; coordinates of vertices defining spatial polygons for each discrete spaital unit. Any two spatial units that share one or more vertices are considered neighbours,
+2. `nb`; a list with one component per spatial unit, where each component contains indices of the neighbouring components of the current spatial unit, and/or
+3. `penalty`; the actual penalty matrix of the MRF basis. This is an $N$ by $N$ matrix with the number of neighbours of each unit on the diagonal, and the $j$th column of the $i$th row set to `-1` if the $j$th spatial unit is a neighbour of the $i$th unit. Elsewhere the penalty matrix is all `0`s.
+
+**mgcv** will create the penalty matrix for you if you supply `polys` or `nb`. As we don't have polygons here, we'll use the information from the `.gra` file converted to the format needed by `gam()` to indicate the neighbourhood.
+
+The `nb` list is passed along using the `xt` argument of the `s()` function. For the MRF basis, `xt` is a named list with one or more of the components listed above. In the model call below we use `xt = list(nb = nb)` to pass on the neighbourhood list. To indicate that an MRF smooth is needed, we use `bs = "mrf"` and the covariate of the smooth is the factor indicating to which spatial unit each observation belongs. In the call below we use the `id` variable. Note that this doesn't need to be a factor, just something that can be coerced to one.
+
+All other aspects of the model fit remain the same hence we use `update()` to add the MRF smooth without repeating everything from the original call.
+
+```{r fit-mrf-model}
+## Fit model with MRF
+## forest.m2 <- gam(aggDefol ~ ph + depth + watermoisture + alkali + humus + type + fert +
+##                      s(age) + s(gradient, k = 20) + s(canopyd) + s(year) + s(alt) +
+##                      s(id, bs = "mrf", xt = list(nb = nb)),
+##                 data = forest, family = ocat(R = 3), method = "REML",
+##                 control = ctrl)
+forest.m2 <- update(forest.m1, . ~ . + s(id, bs = "mrf", xt = list(nb = nb)))
+```
+
+Look at the model summary:
+
+```{r summary-mrf-model}
+summary(forest.m2)
+```
+
+What differences do you see beween the model with the MRF spatial effect and te first model that we fitted?
+
+Quickly create plots of the fitte dsmooth functions
+
+```{r plot-mrf-smooths}
+plot(forest.m2, pages = 1, shade = 2, scale = 0, seWithMean = TRUE)
+```
+
+Notice that here we use `seWithMean = TRUE` as one of the terms has been shrunk back to a linear function and would otherwise have a *bow tie* confidence interval.
+
+Compare these fitted functions with those from the original model. Are these more in keeping with expectations?
+
+Model diagnostics are difficult with models fordiscrete responses such as these. Instead we can interrogate the model to derive quantities of interest that illustrate or summaris the model fit. First we start by generating posterior probabilities for the three ordinal defoliation/damage categories using `predict()`. This is similar to the code Eric showed this morning for the ordered categorical family.
+
+```{r fitted-values}
+fit <- predict(forest.m2, type = "response")
+colnames(fit) <- levs
+head(fit)
+```
+
+The `predict()` method returns a 3-column matrix, one column per category. The entries in the matrix are the posterior probilities of class membership, with rows summing to 1. As we'll see later, we can take a *majority wins* approach and assign each observation a fitted class membership and compare these to the known classes.
+
+For easier visualisation it would be nicer to have these fitted probabilities in a tidy form, which we now do via a few manipulations
+
+```{r process-fitted-values}
+fit <- setNames(stack(as.data.frame(fit)), c("Prob", "Defoliation"))
+fit <- transform(fit, Defoliation = factor(Defoliation, labels = levs))
+fit <- with(forest, cbind(fit, x, y, year))
+head(fit)
+```
+
+The fitted values are now ready for plotting. Here we plot just the years 2000--2004, showing the spatial arrangement of trees, faceted by defoliation/damage category:
+
+```{r plot-fitted}
+ggplot(subset(fit, year >= 2000), aes(x = x, y = y, col = Prob)) +
+    geom_point(size = 1.2) +
+    facet_grid(Defoliation ~ year) +
+    coord_fixed() +
+    theme(legend.position = "top")
+```
+
+A more complex use of the model involves predicting change in class posterior probability over time whilst holding all other variables at the observed mean or category mode
+
+```{r timeseries-predictions}
+N <- 200
+pdat <- with(forest, expand.grid(year = seq(min(year), max(year), length = N),
+                                 age = mean(age, na.rm = TRUE),
+                                 gradient = mean(gradient, na.rm = TRUE),
+                                 canopyd = mean(canopyd, na.rm = TRUE),
+                                 alt = mean(alt, na.rm = TRUE),
+                                 depth = mean(depth, na.rm = TRUE),
+                                 ph = mean(ph, na.rm = TRUE),
+                                 humus = factor(2, levels = levels(humus)),
+                                 watermoisture = factor(2, levels = levels(watermoisture)),
+                                 alkali = factor(2, levels = levels(alkali)),
+                                 type = factor(0, levels = c(0,1)),
+                                 fert = factor(0, levels = c(0,1)),
+                                 id = levels(id)))
+pred <- predict(forest.m2, newdata = pdat, type = "response", exclude = "s(id)")
+colnames(pred) <- levs
+pred <- setNames(stack(as.data.frame(pred)), c("Prob","Defoliation"))
+pred <- cbind(pred, pdat)
+pred <- transform(pred, Defoliation = factor(Defoliation, levels = levs))
+```
+
+A plot of the predictions is produced using
+
+```{r plot-timeseries-predictions}
+ggplot(pred, aes(x = year, y = Prob, colour = Defoliation)) +
+    geom_line() +
+    theme(legend.position = "top")
+```
+
+Using similar code, produce a plot for the effect of `age` holding other values at the mean or mode.
+
+The final summary of the model that we'll produce is a confusion matrix of observed and predicted class membership. Technically, this is over-optimistic as we are using the same data to both fit and test the model, but it is an illustration of how well the model does are fitting the observed classes.
+
+```{r confusion-matrix}
+fit <- predict(forest.m2, type = "response")
+fitClass <- factor(levs[apply(fit, 1, which.max)], levels = levs)
+obsClass <- with(forest, factor(aggDefol, labels = levs))
+sum(fitClass == obsClass) / length(fitClass)
+table(fitClass, obsClass)
+```
+
+Just don't take it as any indication of how well the model will do at predicting the defolition class for a new year or tree.
+
+How better does the model with the MRF spatial effect fit the data compared to the original model that was fitted? We can use AIC as one means of answering that question
+
+```{r aic}
+AIC(forest.m1, forest.m2)
+```
+
+Which model does AIC indicate as fitting the data best?
+
+## Exercise
+
+As an additional exercise, replace the MRF smooth with a 2-d spline of the `x` and `y` coordinates and preduce maps of the class probabilities over the spatial domain. You'll need to use ideas and techniques from some of the other spatial examples in order to complete this task.
