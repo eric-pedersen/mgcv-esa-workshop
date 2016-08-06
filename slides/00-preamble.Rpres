@@ -1,6 +1,6 @@
 The mgcv package as a one-stop-shop for fitting non-linear ecological models
 ============================
-author: David L Miller, Eric Pedersen, and Gavin Simpson
+author: David L Miller, Eric Pedersen, and Gavin L Simpson
 css: custom.css
 transition: none
 
@@ -32,6 +32,12 @@ Eric Pedersen
 
 Gavin Simpson
 =============
+
+- (Palaeo)ecologist interested in community dynamics & environmental change
+- (Palaeo)limnologist interested in environmental change
+- Self-taught not-statistician
+- Ecological stats software (vegan plus some palaeo stuff)
+- To me most things are a model I can (will!) fit with *mgcv*
 
 David L Miller
 ===============
