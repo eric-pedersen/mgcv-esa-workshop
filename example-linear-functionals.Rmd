@@ -1,0 +1,232 @@
+---
+title: "Linear functionals; or: what to do when you've got a bunch of x-values and only one y"
+author: Eric Pedersen
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: readable
+    highlight: haddock
+---
+
+##1. Background
+
+Up to now, we've been looking at data where every coefficient we're using to 
+predict our y-values consists of a single value for each y. However, not all 
+predictor data looks like this. In many cases, a single coefficient may have 
+several values associated with the same outcome variable. For instance, Let's
+say we've measured total ecosystem production in several different lakes, as
+well as temperature along a gradient away from shoreline in the lake. We want to know:
+
+1. how well temperature predicts production
+2. whether temperatures at different distances from the shore have different effects on
+production (as production varies a lot between the littoral and pelagic zone).
+
+Now, there looks like there might be a few ways to answer this in a standard gam
+setting. First we could just average temperatures across locations and use that 
+as a predictor to answer question 1. However, that doesn't give us any insight 
+into question 2, and it's pretty easy to imagine a case like warmer temperatures
+at the shore increase production, but warmer temperatures in the middle of the 
+lake have very little effect, or where a single warm area could substantially
+increase production even in a cold lake. We could also try to fit a seperate
+smooth of production on temperature at each shore distance. However, if we have
+a lot of distances, this ends up fitting a bunch of seperate smooths, and we'd
+rapidly run out of degrees of freedom. Also, it would mean throwing away
+information; we'd expect that the effect of temperature a meter below from the
+shore should be very similar to the effect of temperature right at the
+shoreline, but by fitting a seperate smooth for each, we're ignoring that (and
+likely going to suffer from concurvity issues to boot!).
+
+What we need is a method that can account for the fact that we have multiple x 
+values for a given predictor. Fortunately, `mcgv` can handle this pretty easily.
+It does this by allowing to pass matrix-valued predictors to `s()` and `te()` 
+terms. When you pass `mgcv` a matrix, it will fit the same smooth function to 
+each of the columns of the matrix, then sum across the rows of the matrix of
+transformed values to give the estimated mean value for a given `y`. Let's say
+`y` is a one-dimensional outcome, with n measured values, and `x` is a matrix
+with n rows and k columns. The predicted values for the ith value of `y` would
+be: $y_i \sim\sum_{j=1}^k f(x_{i,j})$, where $f(x_{i,j})$ is itself a sum of
+basis functions multiplied by model coefficients as before.
+
+In mathemetical terms, this makes our smooth term a *functional*, where our
+outcome is a function of a vector of terms rather than a single term, and a
+linear functional, as it's a linear sum of smooth terms for each column; but you
+really don't need to know much about functionals to use these. I only mention
+the functional thing because if you want to dig into this approach further or if
+you want to read help files on these, as you have to search
+`?linear.functional.terms`.
+
+There's a few major useages Ive found for these. There's likely more than this,
+but these are all cases I've encountered. Also, each of these cases requires you
+to set up your predictor matrices carefully, so make sure you know what kind of
+functional you'll be fitting, and what predictor matrix is going where in the `s()`
+function.
+
+### Case 1. Nonlinear averaging. 
+The first case, and the simplest to fit, is to estimate 
+a nonlinear average. Let's look at the lake example from before. Say we think 
+that distance from shore shouldn't matter, but that production increases
+non-linearly with temperature. In that case, a cold lake with a few hot spots
+may actually be more productive than a lake that's consitently luke warm.
+Therefore, if you average over temperatures before estimating a function, you'll 
+miss this effect (as we know from statistics that the average of a non-linear
+function applied to x does not, in general, equal the function applied to the
+average of x). In this case, we can just provide a matrix of values (the predictor matrix) to `s()`: in this case, the predictor matrix is a matrix of temperatures where each column is the temperature measured at one of our sites. 
+We do this in the code below with the variable `temp_matrix`. 
+
+
+```{r, echo=T,tidy=F,include=T, message=FALSE,highlight=TRUE}
+library(dplyr)
+library(mgcv)
+library(ggplot2)
+library(tidyr)
+n_lakes = 200
+lake_mean_temps = rnorm(n_lakes, 25,6)
+lake_data = as.data.frame(expand.grid(lake = 1:n_lakes,
+                                      shore_dist_m = c(0,1,5,10,20,40)))
+lake_data$temp = rnorm(n_lakes*6, lake_mean_temps[lake_data$lake], 8)
+lake_data$production = 5*dnorm(lake_data$temp, 30, sd = 5)/dnorm(1,0,5)+rnorm(n_lakes*6, 0, 1)
+lake_data = lake_data %>% group_by(lake)%>%
+  mutate(production = mean(production),
+         mean_temp = mean(temp))%>%
+  spread(shore_dist_m, temp)
+
+
+lake_data$temp_matrix = lake_data %>% 
+  select(`0`:`40`) %>%
+  as.matrix(.)
+head(lake_data)
+
+
+mean_temp_model = gam(production~s(mean_temp),data=lake_data)
+nonlin_temp_model = gam(production~s(temp_matrix),
+                                data=lake_data)
+
+layout(matrix(1:2, nrow=1))
+plot(mean_temp_model)
+plot(nonlin_temp_model)
+layout(1)
+temp_predict_data = data.frame(temp = seq(10,40,length=100),
+                          mean_temp = seq(10,40,length=100))
+
+temp_matrix = matrix(seq(10,40,length=100),nrow= 100,ncol=6,
+                                       byrow = F) 
+
+temp_predict_data = temp_predict_data %>%
+  mutate(linear_average = as.numeric(predict(mean_temp_model,.)),
+         nonlinear_average = as.numeric(predict(nonlin_temp_model, .)),
+        true_function = 5*dnorm(temp, 30, sd = 5)/dnorm(1,0,5))%>%
+  gather(model, value,linear_average:true_function)
+
+#This plots the two fitted models vs. the true model.
+ggplot(aes(temp, value,color=model), data=temp_predict_data)+
+  geom_line()+
+  scale_color_brewer(palette="Set1")+
+  theme_bw(20)
+```
+
+The nonlinear model is substantially more uncertain at the ends,
+bu it fits the true function much more effectively. The function from 
+the average data substantially underestimates the effect of temperature on 
+production.
+
+### Case 2: Weighted averaging
+The next major case where linear functionals are useful is for weighted 
+averages. Here, you have some predictor variable measured at various points at
+different distances or lags from a given point, or at different locations along
+some gradient. This could be a variable that's been meaured at various distances
+away from each observed site, and you want to understand at what scale that
+variable will affect your parameter of interest. It could also be a predictor
+variable measured at several time points before the observation, and you want to
+know what at what lags the two variables interact.
+
+In this case, we'll assume that the relationship between our variable of 
+interest (x) and the outcome is linear at any given lag, but that linear
+relationship changes smoothly with the lag. We'll look at the case where both
+relationships are nonlinear next. Here we have to create two matrices. The first
+is the lag matrix, and it will have one column for each lag we're interested in. 
+All the values in a given column will be equal to the lag value.
+The second matrix is the predictor matrix, and it is the same as (see [the section below](#by_var)) on `by=` terms on how this works).
+
+
+```{r, echo=T,tidy=F,include=T, message=FALSE,highlight=TRUE}
+library(dplyr)
+library(mgcv)
+library(ggplot2)
+library(tidyr)
+n_lakes = 200
+lake_mean_temps = rnorm(n_lakes, 25,6)
+lake_data = as.data.frame(expand.grid(lake = 1:n_lakes,
+                                      shore_dist_m = c(0,1,5,10,20,40)))
+lake_data$temp = rnorm(n_lakes*6, lake_mean_temps[lake_data$lake], 8)
+lake_data$production = with(lake_data, rnorm(n_lakes*6, 
+                             temp*3*exp(-shore_dist_m/10),1))
+lake_data = lake_data %>% group_by(lake)%>%
+  mutate(production = mean(production),
+         mean_temp = mean(temp))%>%
+  spread(shore_dist_m, temp)
+
+#This is our lag matrix for this example
+shore_dist_matrix = matrix(c(0,1,5,10,20,40), nrow=n_lakes,ncol=6, byrow = T)
+head(shore_dist_matrix)
+
+#This is our predictor matrix
+lake_data$temp_matrix = lake_data %>% 
+  select(`0`:`40`) %>%
+  as.matrix(.)
+head(lake_data)
+
+#Note: we need to set k=6 here, as we really only have 6 degrees of freedom (one
+#for each distance we've measured from the shore.
+
+nonlin_temp_model = gam(production~s(shore_dist_matrix, by= temp_matrix,k=6),
+                                data=lake_data)
+plot(nonlin_temp_model)
+
+#This plots the two fitted models vs. the true model.
+ggplot(aes(temp, value,color=model), data=temp_predict_data)+
+  geom_line()+
+  scale_color_brewer(palette="Set1")+
+  theme_bw(20)
+```
+
+## 2. Key concepts and functions
+
+### using `by=` terms in smoothers {#by_var}
+One of the most useful features in `mgcv` is the `by=` argument for smooths. 
+This has two uses. 
+
+1. For a given smooth (say, `y~s(x)`), if you set `s(x,by=group`), where group
+is some factor-leveled predictor, `mgcv` will fit a seperate smooth of x for
+each level of that factor. The model will produce a different smooth $s_k(x)$
+for each kth level, allowing you to test if a given relationship varies betewen
+group. 
+2. If you instead you set `s(x, by=z)` where z is a numerical value, `mgcv` will
+fit a varying slopes regression. Instead of modeling y as a smooth function of
+x, this will model y as a *linear* function of z, where the slope of the
+relationship between z and y changes smoothly as a function of x, so the 
+predicted value for the ith value of y would be:  $y_i \sim  f(x_i) \cdot z_i$. 
+If you're using matrix predictors as discussed above, for numerical predictors 
+the `by` variable `z` also has to be a matrix with the same dimensions as `x`. 
+The predicted value in this case will be: $y_i \sim  \sum_{j=1}^k f(x_{i,j})\cdot z_{i,j}$, where $j$ are the columns of the matrices $x$ and $z$.
+
+
+##Calculating dispersal kernels
+
+```{r, echo=T,tidy=F,include=T, message=FALSE,highlight=TRUE}
+yukon_seedling_data = read.csv("data/yukon_seeds/seed_data.csv")
+yukon_source_data  =read.csv("data/yukon_seeds/seed_source_locations.csv")
+seed_dist = matrix(0, nrow = nrow(yukon_seedling_data), 
+                   ncol= nrow(yukon_source_data))
+for(i in 1:nrow(yukon_seedling_data)){
+    seed_dist[i,] = sqrt((yukon_source_data$X- yukon_seedling_data$X[i])^2 + (yukon_source_data$Y- yukon_seedling_data$Y[i])^2)
+}
+seed_dist_l = log(seed_dist)
+yukon_seedling_data$min_dist_l = apply(seed_dist_l, MARGIN = 1,min)
+
+basic_dispersal_model = gam(n_spruce~s(min_dist_l)+offset(log(plot_area_m2)),
+                            data=yukon_seedling_data, family=nb)
+full_dispersal_model = gam(n_spruce~s(seed_dist_l)+offset(log(plot_area_m2)),
+                            data=yukon_seedling_data, family=nb)
+```
+
