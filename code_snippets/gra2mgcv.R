@@ -11,7 +11,7 @@ gra2mgcv <- function(file) {
     ids <- seq.int(1, by = 3, length.out = N)
     nbs <- seq.int(3, by = 3, length.out = N)
     node2id <- function(nodes, ids) {
-        as.numeric(ids[as.numeric(nodes)])
+        as.numeric(ids[as.numeric(nodes) + 1])
     }
     l <- lapply(strsplit(gra[nbs], " "), node2id, ids = gra[ids])
     names(l) <-  gra[ids]
