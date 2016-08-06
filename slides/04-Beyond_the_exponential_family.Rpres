@@ -338,7 +338,7 @@ Using ocat
 ocat_predict = predict(ocat_model,type = "response")
 colnames(ocat_predict) = c("1","2","3")
 ocat_predict = as.data.frame(ocat_predict)%>%
-  mutate(x= fitted(ocat_model),y=dat$y)%>%
+  mutate(x= fitted(ocat_model),y=as.numeric(dat$y))%>%
   gather(pred_level,prediction,`1`:`3`)%>%
   mutate(pred_level = as.numeric(pred_level),
          obs_val = as.numeric(y==pred_level))

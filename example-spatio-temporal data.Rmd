@@ -1,0 +1,408 @@
+---
+title: "Spatio-temporal dynamics is for the birds"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: readable
+    highlight: haddock
+---
+
+##1. Background 
+We've talked about modelling spatial trends in the main workshop and in an
+extended example, and about the trials and tribulations of time series data
+in another extended example. Here, we're going to combine these, to look at 
+one of the most challenging types of data for linear models to deal with:
+spatiotemporal data. A spatiotemporal dataset is one where the outcome of
+interest has been observed at multiple locations and at multiple points in time,
+and we want to know how temporal trends change across the landscape (or, from
+the other view, how spatial patterns are changing over time). 
+
+We don't have time to really get into the nuts and bolts issues around fitting 
+complex spatio-temporal models. This exercise is instead designed to give you
+a feel for how to use `mgcv` to model complex interactions between variables
+with different natural scales, and how to include simple random effects into 
+gam models.
+
+## 2. Key concepts and functions: 
+Here's a few key ideas and R functions you should familiarize yourself with if 
+you haven't already encountered them before. For the R functions (which will be)
+highlighted `like this`, use `?function_name` to look them up. 
+
+### Tensor product (`te`) smooths
+This tutorial will rely on tensor product smooths. These are used to model 
+nonlinear interactions between variables that have different natural scales. The
+interaction smooths we saw in the start of the workshop were thin plate splines 
+`y~s(x1,x2, bs="tp")`). These splines assume that the relationship between y and
+x1 should be roughly as "wiggly" as the relationship between y and x2, and only
+has one smoothing parameter. This makes sense if x1 and x2 are similar variables
+(say latitude and longitude, or arm length and leg length), but if we're looking
+at the interacting effects of, say, temperature and body weight, a single
+smoothing term doesn't make sense.
+
+This is where tensor product smooths come in. These assume that each variable of
+interest should have its own smooth term. These create multi-dimensional smooth 
+terms by multiplying the values of each one-dimensional basis by each value of
+the second. This is a pretty complicated idea, and hard to describe effectively 
+without more math than we want to go into here. But you can get the idea from a
+simple example. Let's say we have two basis functions, one for variable x1 and 
+one for variable x2. The function for x1 is a bell-curve shaped, and the one for
+x2 is linear. The basis functions will look like this:
+
+```{r, echo=T,tidy=F,results="hide", include=T, message=FALSE,highlight=TRUE}
+library(mgcv)
+library(ggplot2)
+library(dplyr)
+library(viridis)
+set.seed(1)
+n=25
+dat = as.data.frame(expand.grid(x1 = seq(-1,1,length.out = n),
+                                x2= seq(-1,1,length=n)))
+dat$x1_margin = -dat$x1
+dat$x2_margin = dnorm(dat$x2,0,0.5)
+dat$x2_margin = dat$x2_margin - mean(dat$x2_margin)
+
+layout(matrix(1:2,ncol=2))
+plot(x1_margin~x1,type="l", data= dat%>%filter(!duplicated(x1)))
+plot(x2_margin~x2,type="l", data= dat%>%filter(!duplicated(x2)))
+layout(1)
+```
+
+However, the tensor product of the two variables is more complicated. Note that
+when x1 is below zero, the effect of x2 is positive at middle values and negative
+at low values, and vice versa when x1 is above zero. 
+```{r, echo=T,tidy=F,results="hide", include=T, message=FALSE,highlight=TRUE}
+dat$x1x2_tensor = dat$x1_margin*dat$x2_margin
+ggplot(aes(x=x1,y=x2,fill=x1x2_tensor),data=dat)+
+  geom_tile()+
+  scale_x_continuous(expand=c(0,0))+
+  scale_y_continuous(expand=c(0,0))+
+  scale_fill_viridis()+
+  theme_bw()
+```
+
+A full tensor product smooth will consist of several basis functions constructed
+like this. The resulting smooth is then fitted using the standard gam model, but
+with multiple penalty terms (one for each term in the tensor product). Each
+penalty penalizes how much the function deviates from a smooth function in the
+direction of one of the variables, averaged over all the other variables. This
+allows us to have the function be more or less wiggly in one direction than
+another. 
+
+They are built using the `te()` function, like this:
+
+```{r, echo=T,tidy=F, include=T, message=FALSE,highlight=TRUE}
+# We'll recycle our fake marginal and tensor products as the expected value for
+# a simulation. Waste not, want not!
+dat$y = rnorm(n^2, dat$x1x2_tensor+dat$x1_margin+dat$x2_margin,0.5) 
+
+te_demo = gam(y~te(x1, x2, k = 4^2),data=dat,method="REML") #k=5^2 so there will be 5 marginal bases for each dimension
+plot.gam(te_demo,scheme = 2)
+summary(te_demo)
+print(te_demo$sp) 
+#These are the estimated smooths for the two dimensions. Note that the smooth for
+#x1 (the linear basis) is way smoother than the one for x2
+```
+
+
+
+### Tensor interaction smooths
+There are many cases when we want an estimate of both the average effect of each
+variable as well as the interaction. This is tough to extract from just using 
+`te()` terms, but if we try to combine the two (say, with 
+`y~s(x1)+s(x2)+te(x1,x2))`) the result is often numerically unstable; it won't
+give reliable consistent separation into the terms we want. Instead, we use `ti`
+terms for the interaction. The `ti` terms are set up so the average effect of
+each variable in the smooth is already excluded from the interaction (and they'll
+have fewer basis functions than the equivalent `te` term). Search `?te` if you're 
+curious about how `mcgv` sets these up; for now, we'll just use them as a black 
+box. 
+
+This is how you use them in practice: 
+
+```{r, echo=T,tidy=F, include=T, message=FALSE,highlight=TRUE}
+# We'll recycle our fake tensor product as the expected value for a simulation
+# Waste not, want not!
+
+ti_demo = gam(y~s(x1,k=4)+s(x2,k=4) +ti(x1, x2, k = 4^2),
+              data=dat,method="REML")
+layout(matrix(1:3,nrow=1))
+plot.gam(ti_demo,scheme = 2)
+layout(1)
+summary(ti_demo)
+print(ti_demo$sp) 
+#These are the estimated smooths for the two dimensions. Note that the smooth for
+#x1 (the linear basis) is way smoother than the one for x2
+```
+
+Note that it does a pretty good job of extracting our assumed marginal 
+basis functions (linear and Gaussian) and the tensor product into three clearly 
+separate functions. 
+
+NOTE: Never use `ti` on its own without including the marginal smooths! This
+is for the same reason you shouldn't exclude individual linear terms but include
+interactions in `glm` models. It really virtually never makes sense to talk about a function with a strong interaction but not marginal effects.
+
+### Random effects smooths
+The last smooth type we'll use in this exercise is the random effects smooth. 
+This is just what it sounds on the box: it's a smooth for factor terms, with one
+coefficient for each level of the group (the basis functions for this case), and 
+a penalty term on the squared value of the coefficients to draw them towards the
+global mean. This is exactly the same mechanism that packages like `lme4` and
+`nlme` use to calculate random effects. In fact, there's a very deep connection
+between gams and mixed effects,but we won't go into that here. 
+
+```{r, echo=T,tidy=F, include=T, message=FALSE,highlight=TRUE}
+n= 10
+n_groups= 10
+group_means = rnorm(n_groups, 0, 2)
+dat = data_frame(group = rep(1:n_groups, each=n),
+                 group_f = factor(group))
+dat$y = rnorm(n*n_groups, 3+group_means[dat$group],2)
+re_demo = gam(y~s(group_f, bs="re"),
+              data=dat,method="REML")
+plot.gam(re_demo,scheme = 2)
+summary(re_demo)
+print(re_demo$sp) 
+```
+
+It's important to know when using `bs="re"` terms whether the variable you're 
+giving it is numeric or factorial. `mgcv` will not raise an error if you give it
+numerical variables to `bs="re"`. Instead, it'll just fit a linear model with a 
+penalty on the slope of the line between x and y. Try it with the data about to 
+see, by switching `s(group_f, bs="re")` with `s(group, bs="re")`. `bs="re"` is 
+set up like this to allow you to use random effects smooths to fit things like 
+varying slopes random effects models, but make sure you know what you're doing
+when venturing into this.
+
+## 3. Spatiotemporal models
+Now that we've covered the key smoothers, let's take a look at how we'd use them
+to model spatiotemporal data. For this section, we'll use data from the Florida 
+routes of the Breeding Bird Survey. If you haven't heard of it before, this is a
+long-term monitoring program tracking bird abundance and diversity across the US 
+and Canada. It consists of many (over 4000) 24.5 mile long routes. Trained 
+observers walk these routes each year during peak breeding season, and every 0.5
+miles, they stop and count and identify all the birds they can see or hear in a
+0.25 mile radius of the stop. This is one of the best long-term data sets we
+have on bird diversity and abundance, and has been used in countless papers. 
+
+Here, we're going to use this data to answer a couple relatively simple
+questions: how does bird species richness vary across the state of Florida, has
+average richness changed over time, and has the spatial pattern of richness
+varied? We obtained data from [this
+site](https://www.pwrc.usgs.gov/bbs/RawData/), and summarized it into the total
+number of different species and the total number of individual birds observed on
+each route in each year in the state of Florida. 
+
+First, we'll load the data, and quickly plot it:
+```{r, echo=T,tidy=F, include=T, message=FALSE,highlight=TRUE}
+library(maps)
+florida_map = map_data("state","florida")%>%
+  transmute(Longitude= long, Latitude = lat, order=order)
+florida_birds = read.csv("data/bbs_data/bbs_florida_richness.csv")
+head(florida_birds)
+
+ggplot(aes(x=Year,y=Richness),data=florida_birds)+geom_point()+
+  theme_bw()
+ggplot(aes(x=Longitude,y=Latitude,col=Richness), data=florida_birds) +
+    geom_polygon(data=florida_map,fill=NA, col="black")+
+  geom_point()+theme_bw()
+```
+
+It looks like richness may have declined in the end of the time series, and
+there seems to be somewhat of a north-south richness gradient, but we need to
+model it to really tease these issues out. 
+
+### Modelling space and time seperately
+We'll first take a stab at this to determine if these mean trends actually come
+out of the model. As richness is a count variable
+we'll use a Poisson gam to model it. This means
+that we're assuming mean richness is the product of a smooth
+function of location and of date, with no interactions; 
+E(richness) = exp(f(year))*exp(g(location)).
+
+```{r, echo=T,tidy=F, include=T, message=FALSE,highlight=TRUE}
+richness_base_model = gam(Richness~ s(Longitude,Latitude)+s(Year),
+                          data=florida_birds,family=poisson,method="REML")
+layout(matrix(1:2,ncol=2))
+plot(richness_base_model,scheme=2)
+layout(1)
+summary(richness_base_model)
+```
+
+Note that we do have a thin-plate interaction between longitude and latitude.
+This is assuming that the gradient should be equally smooth latitudinally and
+longitudinally. This may not be totally accurate, as the function seems to
+change faster latitudinally, but we'll ignore that until the exercises at the 
+bottom. The model seems to be doing pretty well; it captured the original patterns
+we saw, and explains a not-inconsiderable 45% of the deviance. 
+
+Let's see if there's any remaining spatiotemporal patterns though:
+
+```{r, echo=T,tidy=F, include=T, message=FALSE,highlight=TRUE}
+source("code_snippets/quantile_resid.R")
+
+florida_birds$base_resid = rqresiduals(richness_base_model)
+
+ggplot(aes(Longitude, Latitude),
+       data= florida_birds %>% filter(Year%%6==0))+ #only look at every 6th year
+  geom_point(aes(color=base_resid))+
+  geom_polygon(data=florida_map,fill=NA, col="black")+
+  scale_color_viridis()+
+  facet_wrap(~Year)+
+  theme_bw()
+
+```
+There's definitely still a pattern in the residuals, such as higher than
+expected diversity in the mid-latitudes during the 1990's.
+
+### Joint models of space and time 
+The next step is to determine if there is a significant interaction. This is
+where tensor product splines come in. Here, we'll use the `ti` formulation, as
+it allows us to directly test whether the interaction significantly improves our
+model.
+
+Something important to note: the `d=c(2,1)` argument it `ti`. This tells the
+function that the smooth should consist of tensor product between a
+2-dimensional smooth (lat-long) and a 1-dimensional term (Year).
+ 
+```{r, echo=T,tidy=F, include=T, message=FALSE,highlight=TRUE}
+richness_ti_model = gam(Richness~ s(Longitude,Latitude)+s(Year) + 
+                          ti(Longitude, Latitude, Year, d=c(2,1)),
+                          data=florida_birds,family=poisson,method="REML")
+layout(matrix(1:2,ncol=2))
+plot(richness_ti_model,scheme=2)
+layout(1)
+summary(richness_ti_model)
+
+```
+This improves the model fit substantially, which you can see by directly
+comparing models with `anova`:
+```{r, echo=T,tidy=F, include=T, message=FALSE,highlight=TRUE}
+anova(richness_base_model,richness_ti_model,test = "Chisq")
+
+```
+
+
+The question then becomes: what does this actually mean? Where are we seeing the
+fastest and slowest rates of change in richness? It's often difficult to
+effectively show spatiotemporal changes, partially as it would require a
+4-dimensional graph to really show what's going on. Still, we can look at a
+couple different views by using `predict` effectively:
+```{r, echo=T,tidy=F, include=T, message=FALSE,highlight=TRUE}
+#First we'll create gridded data
+predict_richess = expand.grid(
+  Latitude= seq(min(florida_birds$Latitude), 
+                max(florida_birds$Latitude),
+                length=50),
+  Longitude = seq(min(florida_birds$Longitude),
+                  max(florida_birds$Longitude),
+                  length=50),
+  Year = seq(1970,2015,by=5)
+)
+# This now selects only that data that falls within Florida's border
+predict_richess = predict_richess[with(predict_richess, 
+                                       inSide(florida_map, Latitude,Longitude)),]
+predict_richess$model_fit = predict(richness_ti_model,
+                                    predict_richess,type = "response")
+ggplot(aes(Longitude, Latitude, fill= model_fit),
+       data=predict_richess)+
+  geom_tile()+
+  facet_wrap(~Year,nrow=2)+
+  scale_fill_viridis("# of species")+
+  theme_bw(10)
+```
+
+
+Another way of looking at this is by estimating the rate of change
+at each location at each time point, and figuring out which locations
+are changing most quickly:
+
+```{r, echo=T,tidy=F, include=T, message=FALSE,highlight=TRUE}
+
+predict_richess$model_change =predict(richness_ti_model,
+                                      predict_richess%>%mutate(Year=Year+1),
+                                      type = "response") -
+  predict_richess$model_fit 
+ggplot(aes(Longitude, Latitude, fill= model_change),
+       data=predict_richess)+
+  geom_tile()+
+  facet_wrap(~Year,nrow=2)+
+  scale_fill_gradient2("Rate of change\n(species per year)")+
+  theme_bw(10)
+```
+
+### Accounting for local heterogeneity with `bs="re"`
+Examining this, it seems to indicate that richness fluctuated across the state
+throughout the study period, but then began sharply declining state-wide in the
+2000's. (Disclaimer: I don't know enough about either the BBS or Florida to say
+how much of this decline is real! Please don't quote me in newspapers saying
+biodiversity is collapsing in Florida).
+
+There is still one persistent issue: viewing the maps of richness, there appear
+to be small hotspots and coldspots of richness across the state. This may be due
+to a factor I've ignored so far: the data is collected in specific, repeated
+routes. If it's just easier to spot birds on one route, or there's a lot of
+local nesting habitat there, it will have higher richness than expected over the
+whole study. Adjusting for these kinds of hot and cold spots will force our
+model to be overly wiggly. Further, not all routes are sampled every year, so we
+want to make sure that our trends don't just result from less diverse routes
+getting sampled later in the survey.
+
+To try and account for this effect (and other grouped local factors), we 
+can use random effects smooths. That would make our model look like this:
+
+```{r, echo=T,tidy=F, include=T, message=FALSE,highlight=TRUE}
+florida_birds$Route_f = factor(florida_birds$Route)
+richness_ti_re_model = gam(Richness~ s(Longitude,Latitude)+s(Year) + 
+                          ti(Longitude, Latitude, Year, d=c(2,1))+
+                          s(Route_f, bs="re"),
+                          data=florida_birds,family=poisson,method="REML")
+layout(matrix(1:3,nrow=1))
+plot(richness_ti_re_model,scheme=2)
+layout(1)
+
+summary(richness_ti_re_model)
+anova(richness_ti_model,richness_ti_re_model)
+```
+
+We can view the same plots as before with our new model:
+```{r, echo=T,tidy=F, include=T, message=FALSE,highlight=TRUE}
+predict_richess$Route_f = 1
+predict_richess$model_fit = predict(richness_ti_re_model,
+                                    predict_richess,type = "response")
+predict_richess$model_change =predict(richness_ti_re_model,
+                                      predict_richess%>%mutate(Year=Year+1),
+                                      type = "response") -
+  predict_richess$model_fit 
+
+ggplot(aes(Longitude, Latitude, fill= model_fit),
+       data=predict_richess)+
+  geom_tile()+
+  facet_wrap(~Year,nrow=2)+
+  scale_fill_viridis("# of species")+
+  theme_bw(10)
+
+ggplot(aes(Longitude, Latitude, fill= model_change),
+       data=predict_richess)+
+  geom_tile()+
+  facet_wrap(~Year,nrow=2)+
+  scale_fill_gradient2("Rate of change\n(species per year)")+
+  theme_bw(10)
+```
+This definely seems to have levelled off some of the hot spots from before, 
+implying that bird richness is more evenly distributed than our prior model 
+suggested. Still, the large-scale trends remain the same from before.
+
+## 4. Exercises
+
+1. Given that most of the variability appears to be latitudinal, try to adapt 
+the tensor smoothers so that latitude,longitude, and year all have their own 
+penalty terms. How does this change model fit? 2. Following up on the prior
+exorcise: build a model that allows you to explicitly calculate the marginal
+latitudinal gradient in diversity, and to determine how the latitudinal gradient
+has changed over time. 3. We know from basic sampling theory that if you sample
+fewer individuals over time, you also expect to find lower richness, even if
+actual richness stays unchanged. What does the spatiotemporal pattern of
+abudance look like? Does adding bird abudance as a predictor explain any of the
+patterns in richness?

@@ -251,7 +251,7 @@ Shortcomings
 - `gam.check` left side can be helpful
 - Right side is victim of artifacts
 - Need an alternative
-- "Randomised quanitle residuals" (*experimental*)
+- "Randomised quantile residuals" (*experimental*)
   - `rqresiduals`
   - Exactly normal residuals ... if the model is right!
 
@@ -294,9 +294,9 @@ type:section
 What is concurvity?
 ======================
 
-- Nonlinear measure, similar to colinearity
+- Nonlinear measure, similar to co-linearity
 
-- Meaures, for each smooth term, how well this term could be approximated by
+- Measures, for each smooth term, how well this term could be approximated by
   - `concurvity(model, full=TRUE)`: some combination of all other smooth terms
   - `concurvity(model, full=FALSE)`: Each of the other smooth terms in the model 
   (useful for identifying which terms are causing issues)
