@@ -54,4 +54,6 @@ Here we'll list some useful papers and books on the topics covered in the course
 - Augustin, N. H., Trenkel, V. M., Wood, S. N., & Lorance, P. (2013). Space-time modelling of blue ling for fisheries stock management. Environmetrics, 24(2), 109–119. [http://doi.org/10.1002/env.2196](http://doi.org/10.1002/env.2196)
 - Miller, D. L., Burt, M. L., Rexstad, E. A., & Thomas, L. (2013). Spatial models for distance sampling data: recent developments and future directions. Methods in Ecology and Evolution, 4(11), 1001–1010. [http://doi.org/10.1111/2041-210X.12105](http://doi.org/10.1111/2041-210X.12105)
 - Wood, S. N., Bravington, M. V., & Hedley, S. L. (2008). Soap film smoothing. Journal of the Royal Statistical Society: Series B (Statistical Methodology), 70(5), 931–955. [http://doi.org/10.1111/j.1467-9868.2008.00665.x](http://doi.org/10.1111/j.1467-9868.2008.00665.x)
+- Course notes from Dave's spatial modelling course at Duke [available here](http://distancesampling.org/workshops/duke-spatial-2015)
+
 
