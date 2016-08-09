@@ -123,10 +123,15 @@ In many cases, what we're interested in is estimating how things are changing
 over time, and the fact that the time series is autocorrelated is a nuisance; it
 makes it harder to get reliable estimates of the trends we're actually
 interested in. In this section, we'll show you how to estimate non-linear
-trends, while accounting for autocorrelation in residuals. This example assumes
-that a time series can be broken down into two main components: a mean effect,
-that changes over time, and an error term with autocorrelated errors, so the
-model for the dependent variable looks like:
+trends, while accounting for autocorrelation in residuals [^trendnote]. 
+
+[^trendnote]: This  is an expanded
+example based on one on Gavin's blog, [available here](http://www.fromthebottomoftheheap.net/2016/03/25/additive-modeling-global-temperature-series-revisited/). His example also has some great code on how to model
+the derivatives of the trend.
+
+This example assumes that a time series can be broken down into two main
+components: a mean effect, that changes over time, and an error term with
+autocorrelated errors, so the model for the dependent variable looks like:
 
 $$y(t) = f(t) + \epsilon(t) $$
 $$\epsilon(t) = \sum_{i=1}^{n} \alpha_i \cdot \epsilon(t-i) + rnorm(0, \sigma)$$
@@ -279,7 +284,13 @@ factors are affecting population growth rates. We can use this information to
 estimate what the equilibrium (carrying capacity) population density is, whether
 this equilibrium is stable, and how quickly we expect the population to return to
 equilibrium after perturbation. We can also use these methods to forecast the
-population into the future, which is very useful for managers.
+population into the future, which is very useful for managers[^lynxnote]. 
+
+[^lynxnote]: This example is
+based off an example by the statistician Cosma Shalizi, at Carnegie Mellon University. The original example starts at page 517 of his book Advanced
+Data Analysis from an Elementary Point of view (the example starts at page 517
+of the pdf draft [available here](http://www.stat.cmu.edu/~cshalizi/ADAfaEPoV/ADAfaEPoV.pdf)). This book
+is a great learning tool for stats in general, and for more on using GAMs. 
 
 We also know, though, that density dependent effects in ecology are often 
 strongly non-linear, so that observed densities at a given time may be a complex
